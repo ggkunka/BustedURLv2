@@ -7,6 +7,10 @@ import os
 import multiprocessing as mp
 from multiprocessing import Manager
 
+# Import your custom classes and functions
+from src.ensemble_model import EnsembleModel  # Add this line to import EnsembleModel
+from src.utils.model_helper import load_data_incrementally, process_chunk_kafka  # Add other necessary imports
+
 # Increase the limit of open files
 soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (min(soft_limit * 10, hard_limit), hard_limit))
