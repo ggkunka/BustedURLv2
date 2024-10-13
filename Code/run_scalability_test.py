@@ -5,9 +5,14 @@ import time
 import signal
 import os
 import multiprocessing as mp
+import logging  # Add logging import
 from multiprocessing import Manager
 from src.ensemble_model import EnsembleModel  # Import the EnsembleModel
 from src.utils.model_helper import load_data_incrementally  # Keep other necessary imports
+
+# Initialize the logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ScalabilityTestLogger")  # Define the logger
 
 # Increase the limit of open files
 soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -116,7 +121,7 @@ def run_scalability_test(progress_tracker):
     dataset_path = 'data/cleaned_data_full.csv'
 
     # Step 1: Run with Kafka and Celery (distributed processing)
-    logger.info("Running Scalability Test (With Kafka and Celery)...")
+    logger.info("Running Scalability Test (With Kafka and Celery)...")  # Use the logger
     start_time = time.time()
 
     num_cpus = 24
@@ -191,9 +196,8 @@ def print_metrics_comparison(baseline_metrics, scalability_metrics):
     print(f"CMAS Average Memory Usage: {scalability_metrics['avg_memory']:.2f}%")
 
     # Print total records processed
-    print(f"Baseline Total Records Processed: {baseline_metrics['total_records']}")
-    print(f"CMAS Total Records Processed: {scalability_metrics['total_records']}")
-
+    print(f"Baseline Total Records Processed: {baseline_metrics.get('total_records', 'N/A')}")
+    print(f"CMAS Total Records Processed: {scalability_metrics.get('total_records', 'N/A')}")
 
 if __name__ == "__main__":
     run_tests()
