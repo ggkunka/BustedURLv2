@@ -11,6 +11,7 @@ from datetime import datetime
 from src.ensemble_model import EnsembleModel
 from src.utils.model_helper import load_data_incrementally
 from kafka_broker import send_message
+from celery import Celery
 
 # Create a timestamp for log filename
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -31,6 +32,9 @@ logger.addHandler(file_handler)
 soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (min(soft_limit * 10, hard_limit), hard_limit))
 
+# Celery setup with Redis
+app = Celery('tasks', broker='redis://localhost:6379/0')
+
 def start_kafka():
     logger.info("Starting Kafka...")
     kafka_process = subprocess.Popen(
@@ -38,7 +42,7 @@ def start_kafka():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
-    time.sleep(10)
+    time.sleep(10)  # Wait for Kafka to initialize
     return kafka_process
 
 def start_celery():
@@ -48,38 +52,61 @@ def start_celery():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
-    time.sleep(5)
+    time.sleep(5)  # Wait for Celery to initialize
     return celery_process
 
 def stop_process(process, name):
     logger.info(f"Stopping {name}...")
-    if process.poll() is None:
-        process.send_signal(signal.SIGTERM)
+    if process.poll() is None:  # If the process is still running
+        process.send_signal(signal.SIGTERM)  # Send termination signal
         try:
-            process.wait(timeout=10)
+            process.wait(timeout=10)  # Wait for process to terminate
         except subprocess.TimeoutExpired:
-            process.kill()
+            process.kill()  # Force kill if it does not stop
     logger.info(f"{name} stopped.")
 
 def print_progress(progress_tracker):
+    """
+    Print progress every 30 seconds.
+    """
     total_chunks = progress_tracker['total_chunks']
     while progress_tracker['processed_chunks'] < total_chunks:
         logger.info(f"Progress: {progress_tracker['processed_chunks']} chunks processed out of {total_chunks}.")
         time.sleep(30)
 
 def process_chunk_kafka(model, chunk, results_queue, progress_tracker):
+    """
+    Processes a chunk using Kafka and Celery.
+    """
     for _, row in chunk.iterrows():
         url = row['url']
         label = row['label']
         features = model.extract_features(url)
         prediction = model.classify(features)
+
+        # Send prediction via Kafka
         send_message('predictions', {'url': url, 'prediction': prediction, 'label': label})
+
+    # Update progress tracker
     progress_tracker['processed_chunks'] += 1
+
+def check_celery_activity():
+    try:
+        result = subprocess.run(
+            ["celery", "-A", "celery_worker", "inspect", "active"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        logger.info(f"Celery activity:\n{result.stdout.decode('utf-8')}")
+    except Exception as e:
+        logger.error(f"Failed to inspect Celery activity: {e}")
 
 def run_tests():
     kafka_process = None
     celery_process = None
     manager = Manager()
+
+    # Shared dictionary to track progress
     progress_tracker = manager.dict()
     progress_tracker['processed_chunks'] = 0
     progress_tracker['total_chunks'] = 0
@@ -96,8 +123,8 @@ def run_tests():
         progress_process.start()
 
         scalability_metrics = run_scalability_test(progress_tracker)
-        progress_process.join()
 
+        progress_process.join()
         print_metrics_comparison(baseline_metrics, scalability_metrics)
 
     finally:
@@ -105,10 +132,13 @@ def run_tests():
             stop_process(kafka_process, "Kafka")
         if celery_process:
             stop_process(celery_process, "Celery")
+        # Check Celery tasks after completion
+        check_celery_activity()
 
 def run_scalability_test(progress_tracker):
     model = EnsembleModel()
     dataset_path = 'data/cleaned_data_full.csv'
+
     logger.info("Running Scalability Test (With Kafka and Celery)...")
     start_time = time.time()
 
@@ -143,6 +173,7 @@ def run_scalability_test(progress_tracker):
 
     pool.close()
     pool.join()
+
     resource_tracker.join()
 
     end_time = time.time()
@@ -165,6 +196,7 @@ def run_scalability_test(progress_tracker):
 def run_subprocess_and_measure(command, script_name):
     start_time = time.time()
     process = subprocess.Popen([command, script_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
     cpu_percentages = []
     memory_usages = []
 
