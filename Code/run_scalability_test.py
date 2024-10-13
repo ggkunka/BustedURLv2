@@ -6,10 +6,8 @@ import signal
 import os
 import multiprocessing as mp
 from multiprocessing import Manager
-
-# Import your custom classes and functions
-from src.ensemble_model import EnsembleModel  # Add this line to import EnsembleModel
-from src.utils.model_helper import load_data_incrementally, process_chunk_kafka  # Add other necessary imports
+from src.ensemble_model import EnsembleModel  # Import the EnsembleModel
+from src.utils.model_helper import load_data_incrementally  # Keep other necessary imports
 
 # Increase the limit of open files
 soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -26,9 +24,6 @@ def start_kafka():
     return kafka_process
 
 def start_celery():
-    """
-    Start Celery worker as a subprocess and return the process.
-    """
     print("Starting Celery worker...")
     celery_process = subprocess.Popen(
         ["celery", "-A", "celery_worker", "worker", "--loglevel=info"],
@@ -39,9 +34,6 @@ def start_celery():
     return celery_process
 
 def stop_process(process, name):
-    """
-    Gracefully stop a subprocess.
-    """
     print(f"Stopping {name}...")
     if process.poll() is None:  # If the process is still running
         process.send_signal(signal.SIGTERM)  # Send termination signal
@@ -59,6 +51,23 @@ def print_progress(progress_tracker):
     while progress_tracker['processed_chunks'] < total_chunks:
         print(f"Progress: {progress_tracker['processed_chunks']} chunks processed out of {total_chunks}.")
         time.sleep(30)
+
+def process_chunk_kafka(model, chunk, results_queue, progress_tracker):
+    """
+    Processes a chunk using Kafka and Celery in a CMAS-like fashion.
+    Each agent (worker) processes the chunk in parallel.
+    """
+    for _, row in chunk.iterrows():
+        url = row['url']
+        label = row['label']  # 1 for malicious, 0 for benign
+        features = model.extract_features(url)
+        prediction = model.classify(features)
+
+        # Send prediction via Kafka
+        send_message('predictions', {'url': url, 'prediction': prediction, 'label': label})
+
+    # Update the progress tracker
+    progress_tracker['processed_chunks'] += 1
 
 def run_tests():
     kafka_process = None
@@ -138,21 +147,6 @@ def run_scalability_test(progress_tracker):
         'total_records': total_records
     }
 
-def process_chunk_kafka(model, chunk, results_queue, progress_tracker):
-    """
-    Process a chunk and update the progress tracker.
-    """
-    for _, row in chunk.iterrows():
-        url = row['url']
-        label = row['label']
-        features = model.extract_features(url)
-        prediction = model.classify(features)
-
-        send_message('predictions', {'url': url, 'prediction': prediction, 'label': label})
-
-    # Update the progress tracker
-    progress_tracker['processed_chunks'] += 1
-
 def run_subprocess_and_measure(command, script_name):
     start_time = time.time()
     process = subprocess.Popen([command, script_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -183,14 +177,23 @@ def run_subprocess_and_measure(command, script_name):
 
 def print_metrics_comparison(baseline_metrics, scalability_metrics):
     print("\n===== Metrics Comparison (Baseline vs CMAS Scalability) =====")
+    
+    # Print total time
     print(f"Baseline Total Time: {baseline_metrics['total_time']:.2f} seconds")
     print(f"CMAS Total Time: {scalability_metrics['total_time']:.2f} seconds")
+    
+    # Print CPU usage
+    print(f"Baseline Average CPU Usage: {baseline_metrics['avg_cpu']:.2f}%")
+    print(f"CMAS Average CPU Usage: {scalability_metrics['avg_cpu']:.2f}%")
+    
+    # Print Memory usage
+    print(f"Baseline Average Memory Usage: {baseline_metrics['avg_memory']:.2f}%")
+    print(f"CMAS Average Memory Usage: {scalability_metrics['avg_memory']:.2f}%")
 
-    print(f"Baseline CPU Usage: {baseline_metrics['avg_cpu']:.2f}%")
-    print(f"CMAS CPU Usage: {scalability_metrics['avg_cpu']:.2f}%")
+    # Print total records processed
+    print(f"Baseline Total Records Processed: {baseline_metrics['total_records']}")
+    print(f"CMAS Total Records Processed: {scalability_metrics['total_records']}")
 
-    print(f"Baseline Memory Usage: {baseline_metrics['avg_memory']:.2f}%")
-    print(f"CMAS Memory Usage: {scalability_metrics['avg_memory']:.2f}%")
 
 if __name__ == "__main__":
     run_tests()
