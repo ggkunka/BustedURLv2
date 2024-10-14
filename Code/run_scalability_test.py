@@ -23,7 +23,7 @@ logger = logging.getLogger("ScalabilityTestLogger")
 log_filename = f"scalability_test_{timestamp}.log"
 file_handler = logging.FileHandler(log_filename)
 file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levellevel)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
