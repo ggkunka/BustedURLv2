@@ -89,7 +89,7 @@ def print_progress(progress_tracker):
         logger.info(f"Progress: {progress_tracker['processed_chunks']} chunks processed out of {total_chunks}.")
         time.sleep(30)
 
-def process_chunk_kafka(model, chunk_dict, results_queue, progress_tracker):
+def process_chunk_kafka(model, chunk_dict, results_queue, progress_tracker, total_records):
     """Processes a chunk using Kafka and Celery in a CMAS-like fashion."""
     for row in chunk_dict:
         url = row['url']
@@ -102,6 +102,19 @@ def process_chunk_kafka(model, chunk_dict, results_queue, progress_tracker):
         send_message('predictions', {'url': url, 'prediction': prediction, 'label': label})
 
     progress_tracker['processed_chunks'] += 1
+    total_records.value += len(chunk_dict)  # Increment the total number of records processed
+
+def reset_system():
+    """Restart Zookeeper, Kafka, Celery, and check Redis status."""
+    logger.info("Resetting system: Stopping and starting Zookeeper, Kafka, and Celery.")
+
+    # Restart Zookeeper, Kafka, and Celery
+    zookeeper_process = start_zookeeper()
+    kafka_process = start_kafka()
+    create_kafka_topic()
+    celery_process = start_celery()
+
+    return zookeeper_process, kafka_process, celery_process
 
 def run_tests():
     zookeeper_process = None
@@ -114,30 +127,29 @@ def run_tests():
     progress_tracker['processed_chunks'] = 0
     progress_tracker['total_chunks'] = 0
 
+    # Shared variable to track total records processed
+    total_records = manager.Value('i', 0)
+
     try:
-        # Start Zookeeper, Kafka, and Celery
-        zookeeper_process = start_zookeeper()
-        kafka_process = start_kafka()
-        celery_process = start_celery()
+        # Start the first chunk of data processing
+        zookeeper_process, kafka_process, celery_process = reset_system()
 
-        # Create Kafka topic
-        create_kafka_topic()
-
+        # Run the Baseline Test
         logger.info("Running Baseline Test (No Kafka, No Celery)...")
         baseline_metrics = run_subprocess_and_measure("python3.12", "tests/test_baseline.py")
-
-        logger.info("Running Scalability Test (With Kafka and Celery)...")
 
         # Start the progress printer as a process
         progress_process = mp.Process(target=print_progress, args=(progress_tracker,))
         progress_process.start()
 
-        scalability_metrics = run_scalability_test(progress_tracker)
+        # Run Incremental Scalability Test (Processing by chunks)
+        logger.info("Running Incremental Scalability Test...")
+        scalability_metrics = run_incremental_scalability_test(progress_tracker, total_records)
 
         # Ensure the progress process is stopped
         progress_process.join()
 
-        # Compare results between baseline and scalability tests
+        # Print comparison between baseline and scalability results
         print_metrics_comparison(baseline_metrics, scalability_metrics)
 
     finally:
@@ -149,43 +161,29 @@ def run_tests():
         if zookeeper_process:
             stop_process(zookeeper_process, "Zookeeper")
 
-def run_scalability_test(progress_tracker):
-    """Run the scalability test and track progress."""
+def run_incremental_scalability_test(progress_tracker, total_records):
+    """Run the scalability test in increments and restart the system between each chunk."""
     model = EnsembleModel()
     dataset_path = 'data/cleaned_data_full.csv'
 
-    logger.info("Running Scalability Test (With Kafka and Celery)...")
-    start_time = time.time()
+    # Determine the number of chunks
+    chunk_size = 10000
+    logger.info("Processing data in chunks of size %d...", chunk_size)
 
-    num_cpus = 24
-    pool = mp.Pool(processes=num_cpus)
-    results_queue = mp.Queue()
+    total_chunks = sum(1 for _ in load_data_incrementally(dataset_path, chunk_size=chunk_size))
+    progress_tracker['total_chunks'] = total_chunks
+    logger.info(f"Total chunks to process: {total_chunks}")
 
-    total_records = 0
-    progress_tracker['total_chunks'] = sum(1 for _ in load_data_incrementally(dataset_path, chunk_size=100))
+    celery_app = Celery('tasks', broker='redis://localhost:6379/0')
 
+    # Track CPU and memory usage across all chunks
     cpu_percentages = []
     memory_usages = []
+    start_time = time.time()
 
-    def track_resources(progress_tracker, cpu_list, mem_list):
-        while progress_tracker['processed_chunks'] < progress_tracker['total_chunks']:
-            cpu = psutil.cpu_percent(interval=1)
-            mem = psutil.virtual_memory().percent
-            cpu_list.append(cpu)
-            mem_list.append(mem)
-
-    resource_manager = Manager()
-    cpu_list = resource_manager.list()
-    mem_list = resource_manager.list()
-
-    resource_tracker = mp.Process(target=track_resources, args=(progress_tracker, cpu_list, mem_list))
-    resource_tracker.start()
-
-    # Process each chunk using Celery
-    celery_app = Celery('tasks', broker='redis://localhost:6379/0')
-    
-    for chunk in load_data_incrementally(dataset_path, chunk_size=10000):
-        logger.info(f"Processing chunk of size {len(chunk)}.")
+    # Iterate over each chunk and reset the system after each one
+    for i, chunk in enumerate(load_data_incrementally(dataset_path, chunk_size=chunk_size), start=1):
+        logger.info(f"Processing chunk {i}/{total_chunks} of size {len(chunk)}.")
 
         # Convert DataFrame to a list of dictionaries for Celery
         chunk_dict = chunk.to_dict(orient='records')
@@ -193,18 +191,23 @@ def run_scalability_test(progress_tracker):
         # Submit the chunk to the Celery worker
         celery_app.send_task('celery_worker.run_ensemble', args=[chunk_dict])
 
-    pool.close()
-    pool.join()
+        # Track resource usage after each chunk
+        cpu_percentages.append(psutil.cpu_percent())
+        memory_usages.append(psutil.virtual_memory().percent)
 
-    resource_tracker.join()
+        logger.info(f"Chunk {i} processed. Resetting system for the next chunk...")
 
-    end_time = time.time()
-    total_time = end_time - start_time
-    avg_cpu = sum(cpu_list) / len(cpu_list) if cpu_list else 0
-    avg_memory = sum(mem_list) / len(mem_list) if mem_list else 0
+        # Stop and reset the system before processing the next chunk
+        stop_system_services()
+        zookeeper_process, kafka_process, celery_process = reset_system()
 
-    logger.info(f"Total records processed with Kafka and Celery: {total_records}")
-    logger.info(f"Processing time with Kafka and Celery: {total_time:.2f} seconds")
+    # Calculate final metrics
+    total_time = time.time() - start_time
+    avg_cpu = sum(cpu_percentages) / len(cpu_percentages) if cpu_percentages else 0
+    avg_memory = sum(memory_usages) / len(memory_usages) if memory_usages else 0
+
+    logger.info(f"Total records processed: {total_records.value}")
+    logger.info(f"Total time taken: {total_time:.2f} seconds")
     logger.info(f"Average CPU usage: {avg_cpu:.2f}%")
     logger.info(f"Average Memory usage: {avg_memory:.2f}%")
 
@@ -212,8 +215,15 @@ def run_scalability_test(progress_tracker):
         'total_time': total_time,
         'avg_cpu': avg_cpu,
         'avg_memory': avg_memory,
-        'total_records': total_records
+        'total_records': total_records.value
     }
+
+def stop_system_services():
+    """Stop the running Zookeeper, Kafka, and Celery services."""
+    # Gracefully stop Celery, Kafka, and Zookeeper before processing the next chunk
+    stop_process(celery_process, "Celery")
+    stop_process(kafka_process, "Kafka")
+    stop_process(zookeeper_process, "Zookeeper")
 
 def run_subprocess_and_measure(command, script_name):
     """Run a subprocess and measure performance metrics."""
@@ -254,7 +264,7 @@ def print_metrics_comparison(baseline_metrics, scalability_metrics):
     logger.info(f"Baseline Average Memory Usage: {baseline_metrics['avg_memory']:.2f}%")
     logger.info(f"CMAS Average Memory Usage: {scalability_metrics['avg_memory']:.2f}%")
     logger.info(f"Baseline Total Records Processed: {baseline_metrics.get('total_records', 'N/A')}")
-    logger.info(f"CMAS Total Records Processed: {scalability_metrics.get('total_records', 'N/A')}")
+    logger.info(f"CMAS Total Records Processed: {scalability_metrics['total_records']}")
 
 if __name__ == "__main__":
     run_tests()
