@@ -34,7 +34,7 @@ def start_zookeeper():
     """Start Zookeeper process."""
     logger.info("Starting Zookeeper...")
     zookeeper_process = subprocess.Popen(
-        ["/home/yzhang10/zookeeper/bin/zkServer.sh", "start"],
+        ["/home/yzhang10/kafka/bin/zookeeper-server-start.sh", "/home/yzhang10/kafka/config/zookeeper.properties"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
