@@ -12,6 +12,7 @@ from src.ensemble_model import EnsembleModel
 from src.utils.model_helper import load_data_incrementally
 from kafka_broker import send_message
 from celery import Celery
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 # Timestamp for log filename
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -89,7 +90,7 @@ def print_progress(progress_tracker):
         logger.info(f"Progress: {progress_tracker['processed_chunks']} chunks processed out of {total_chunks}.")
         time.sleep(30)
 
-def process_chunk_kafka(model, chunk_dict, results_queue, progress_tracker, total_records):
+def process_chunk_kafka(model, chunk_dict, results_queue, progress_tracker, total_records, true_labels, predicted_labels):
     """Processes a chunk using Kafka and Celery in a CMAS-like fashion."""
     for row in chunk_dict:
         url = row['url']
@@ -100,6 +101,10 @@ def process_chunk_kafka(model, chunk_dict, results_queue, progress_tracker, tota
         # Log and send prediction via Kafka
         logger.info(f"Sending prediction message to Kafka for URL: {url}")
         send_message('predictions', {'url': url, 'prediction': prediction, 'label': label})
+
+        # Track true and predicted labels
+        true_labels.append(label)
+        predicted_labels.append(prediction)
 
     progress_tracker['processed_chunks'] += 1
     total_records.value += len(chunk_dict)  # Increment the total number of records processed
@@ -130,6 +135,10 @@ def run_tests():
     # Shared variable to track total records processed
     total_records = manager.Value('i', 0)
 
+    # List to store true and predicted labels
+    true_labels = manager.list()
+    predicted_labels = manager.list()
+
     try:
         # Start the first chunk of data processing
         zookeeper_process, kafka_process, celery_process = reset_system()
@@ -144,7 +153,7 @@ def run_tests():
 
         # Run Incremental Scalability Test (Processing by chunks)
         logger.info("Running Incremental Scalability Test...")
-        scalability_metrics = run_incremental_scalability_test(progress_tracker, total_records, zookeeper_process, kafka_process, celery_process)
+        scalability_metrics = run_incremental_scalability_test(progress_tracker, total_records, zookeeper_process, kafka_process, celery_process, true_labels, predicted_labels)
 
         # Ensure the progress process is stopped
         progress_process.join()
@@ -161,7 +170,7 @@ def run_tests():
         if zookeeper_process:
             stop_process(zookeeper_process, "Zookeeper")
 
-def run_incremental_scalability_test(progress_tracker, total_records, zookeeper_process, kafka_process, celery_process):
+def run_incremental_scalability_test(progress_tracker, total_records, zookeeper_process, kafka_process, celery_process, true_labels, predicted_labels):
     """Run the scalability test in increments and restart the system between each chunk."""
     model = EnsembleModel()
     dataset_path = 'data/cleaned_data_full.csv'
@@ -206,16 +215,30 @@ def run_incremental_scalability_test(progress_tracker, total_records, zookeeper_
     avg_cpu = sum(cpu_percentages) / len(cpu_percentages) if cpu_percentages else 0
     avg_memory = sum(memory_usages) / len(memory_usages) if memory_usages else 0
 
+    # Calculate Accuracy, Precision, Recall, and F1 Score
+    accuracy = accuracy_score(true_labels, predicted_labels)
+    precision = precision_score(true_labels, predicted_labels)
+    recall = recall_score(true_labels, predicted_labels)
+    f1 = f1_score(true_labels, predicted_labels)
+
     logger.info(f"Total records processed: {total_records.value}")
     logger.info(f"Total time taken: {total_time:.2f} seconds")
     logger.info(f"Average CPU usage: {avg_cpu:.2f}%")
     logger.info(f"Average Memory usage: {avg_memory:.2f}%")
+    logger.info(f"Accuracy: {accuracy:.4f}")
+    logger.info(f"Precision: {precision:.4f}")
+    logger.info(f"Recall: {recall:.4f}")
+    logger.info(f"F1 Score: {f1:.4f}")
 
     return {
         'total_time': total_time,
         'avg_cpu': avg_cpu,
         'avg_memory': avg_memory,
-        'total_records': total_records.value
+        'total_records': total_records.value,
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1
     }
 
 def stop_system_services(zookeeper_process, kafka_process, celery_process):
@@ -265,6 +288,10 @@ def print_metrics_comparison(baseline_metrics, scalability_metrics):
     logger.info(f"CMAS Average Memory Usage: {scalability_metrics['avg_memory']:.2f}%")
     logger.info(f"Baseline Total Records Processed: {baseline_metrics.get('total_records', 'N/A')}")
     logger.info(f"CMAS Total Records Processed: {scalability_metrics['total_records']}")
+    logger.info(f"Accuracy: {scalability_metrics['accuracy']:.4f}")
+    logger.info(f"Precision: {scalability_metrics['precision']:.4f}")
+    logger.info(f"Recall: {scalability_metrics['recall']:.4f}")
+    logger.info(f"F1 Score: {scalability_metrics['f1']:.4f}")
 
 if __name__ == "__main__":
     run_tests()
