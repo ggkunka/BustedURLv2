@@ -13,14 +13,12 @@ from src.utils.model_helper import load_data_incrementally
 from kafka_broker import send_message
 from celery import Celery
 
-# Create a timestamp for log filename
+# Timestamp for log filename
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-# Initialize the logger with both console and file logging
+# Initialize logger with both console and file logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("ScalabilityTestLogger")
-
-# Create file handler to log to a file with a timestamped name
 log_filename = f"scalability_test_{timestamp}.log"
 file_handler = logging.FileHandler(log_filename)
 file_handler.setLevel(logging.INFO)
@@ -32,10 +30,19 @@ logger.addHandler(file_handler)
 soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (min(soft_limit * 10, hard_limit), hard_limit))
 
-# Celery setup with Redis
-app = Celery('tasks', broker='redis://localhost:6379/0')
+def start_zookeeper():
+    """Start Zookeeper process."""
+    logger.info("Starting Zookeeper...")
+    zookeeper_process = subprocess.Popen(
+        ["/home/yzhang10/zookeeper/bin/zkServer.sh", "start"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    time.sleep(10)  # Wait for Zookeeper to initialize
+    return zookeeper_process
 
 def start_kafka():
+    """Start Kafka process."""
     logger.info("Starting Kafka...")
     kafka_process = subprocess.Popen(
         ["/home/yzhang10/kafka/bin/kafka-server-start.sh", "/home/yzhang10/kafka/config/server.properties"],
@@ -46,6 +53,7 @@ def start_kafka():
     return kafka_process
 
 def start_celery():
+    """Start Celery worker."""
     logger.info("Starting Celery worker...")
     celery_process = subprocess.Popen(
         ["celery", "-A", "celery_worker", "worker", "--loglevel=info"],
@@ -55,7 +63,16 @@ def start_celery():
     time.sleep(5)  # Wait for Celery to initialize
     return celery_process
 
+def create_kafka_topic():
+    """Create the Kafka 'predictions' topic."""
+    logger.info("Creating Kafka topic 'predictions'...")
+    subprocess.run([
+        "/home/yzhang10/kafka/bin/kafka-topics.sh", "--create", "--topic", "predictions",
+        "--bootstrap-server", "localhost:9092", "--partitions", "1", "--replication-factor", "1"
+    ])
+
 def stop_process(process, name):
+    """Stop a given process."""
     logger.info(f"Stopping {name}...")
     if process.poll() is None:  # If the process is still running
         process.send_signal(signal.SIGTERM)  # Send termination signal
@@ -66,42 +83,28 @@ def stop_process(process, name):
     logger.info(f"{name} stopped.")
 
 def print_progress(progress_tracker):
-    """
-    Print progress every 30 seconds.
-    """
+    """Print progress every 30 seconds."""
     total_chunks = progress_tracker['total_chunks']
     while progress_tracker['processed_chunks'] < total_chunks:
         logger.info(f"Progress: {progress_tracker['processed_chunks']} chunks processed out of {total_chunks}.")
         time.sleep(30)
 
 def process_chunk_kafka(model, chunk, results_queue, progress_tracker):
-    """
-    Processes a chunk using Kafka and Celery.
-    """
+    """Processes a chunk using Kafka and Celery in a CMAS-like fashion."""
     for _, row in chunk.iterrows():
         url = row['url']
-        label = row['label']
+        label = row['label']  # 1 for malicious, 0 for benign
         features = model.extract_features(url)
         prediction = model.classify(features)
 
-        # Send prediction via Kafka
+        # Log and send prediction via Kafka
+        logger.info(f"Sending prediction message to Kafka for URL: {url}")
         send_message('predictions', {'url': url, 'prediction': prediction, 'label': label})
 
-    # Update progress tracker
     progress_tracker['processed_chunks'] += 1
 
-def check_celery_activity():
-    try:
-        result = subprocess.run(
-            ["celery", "-A", "celery_worker", "inspect", "active"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        logger.info(f"Celery activity:\n{result.stdout.decode('utf-8')}")
-    except Exception as e:
-        logger.error(f"Failed to inspect Celery activity: {e}")
-
 def run_tests():
+    zookeeper_process = None
     kafka_process = None
     celery_process = None
     manager = Manager()
@@ -112,30 +115,42 @@ def run_tests():
     progress_tracker['total_chunks'] = 0
 
     try:
+        # Start Zookeeper, Kafka, and Celery
+        zookeeper_process = start_zookeeper()
         kafka_process = start_kafka()
         celery_process = start_celery()
+
+        # Create Kafka topic
+        create_kafka_topic()
 
         logger.info("Running Baseline Test (No Kafka, No Celery)...")
         baseline_metrics = run_subprocess_and_measure("python3.12", "tests/test_baseline.py")
 
         logger.info("Running Scalability Test (With Kafka and Celery)...")
+
+        # Start the progress printer as a process
         progress_process = mp.Process(target=print_progress, args=(progress_tracker,))
         progress_process.start()
 
         scalability_metrics = run_scalability_test(progress_tracker)
 
+        # Ensure the progress process is stopped
         progress_process.join()
+
+        # Compare results between baseline and scalability tests
         print_metrics_comparison(baseline_metrics, scalability_metrics)
 
     finally:
+        # Ensure Zookeeper, Kafka, and Celery are stopped even if an error occurs
         if kafka_process:
             stop_process(kafka_process, "Kafka")
         if celery_process:
             stop_process(celery_process, "Celery")
-        # Check Celery tasks after completion
-        check_celery_activity()
+        if zookeeper_process:
+            stop_process(zookeeper_process, "Zookeeper")
 
 def run_scalability_test(progress_tracker):
+    """Run the scalability test and track progress."""
     model = EnsembleModel()
     dataset_path = 'data/cleaned_data_full.csv'
 
@@ -166,10 +181,14 @@ def run_scalability_test(progress_tracker):
     resource_tracker = mp.Process(target=track_resources, args=(progress_tracker, cpu_list, mem_list))
     resource_tracker.start()
 
+    # Process each chunk using Celery
+    celery_app = Celery('tasks', broker='redis://localhost:6379/0')
+    
     for chunk in load_data_incrementally(dataset_path, chunk_size=100):
-        total_records += len(chunk)
         logger.info(f"Processing chunk of size {len(chunk)}.")
-        pool.apply_async(process_chunk_kafka, args=(model, chunk, results_queue, progress_tracker))
+
+        # Submit the chunk to the Celery worker
+        celery_app.send_task('celery_worker.run_ensemble', args=[chunk])
 
     pool.close()
     pool.join()
@@ -194,6 +213,7 @@ def run_scalability_test(progress_tracker):
     }
 
 def run_subprocess_and_measure(command, script_name):
+    """Run a subprocess and measure performance metrics."""
     start_time = time.time()
     process = subprocess.Popen([command, script_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -222,6 +242,7 @@ def run_subprocess_and_measure(command, script_name):
     }
 
 def print_metrics_comparison(baseline_metrics, scalability_metrics):
+    """Print comparison between baseline and scalability metrics."""
     logger.info("\n===== Metrics Comparison (Baseline vs CMAS Scalability) =====")
     logger.info(f"Baseline Total Time: {baseline_metrics['total_time']:.2f} seconds")
     logger.info(f"CMAS Total Time: {scalability_metrics['total_time']:.2f} seconds")
