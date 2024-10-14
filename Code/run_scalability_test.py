@@ -89,9 +89,9 @@ def print_progress(progress_tracker):
         logger.info(f"Progress: {progress_tracker['processed_chunks']} chunks processed out of {total_chunks}.")
         time.sleep(30)
 
-def process_chunk_kafka(model, chunk, results_queue, progress_tracker):
+def process_chunk_kafka(model, chunk_dict, results_queue, progress_tracker):
     """Processes a chunk using Kafka and Celery in a CMAS-like fashion."""
-    for _, row in chunk.iterrows():
+    for row in chunk_dict:
         url = row['url']
         label = row['label']  # 1 for malicious, 0 for benign
         features = model.extract_features(url)
@@ -184,11 +184,14 @@ def run_scalability_test(progress_tracker):
     # Process each chunk using Celery
     celery_app = Celery('tasks', broker='redis://localhost:6379/0')
     
-    for chunk in load_data_incrementally(dataset_path, chunk_size=100):
+    for chunk in load_data_incrementally(dataset_path, chunk_size=10000):
         logger.info(f"Processing chunk of size {len(chunk)}.")
 
+        # Convert DataFrame to a list of dictionaries for Celery
+        chunk_dict = chunk.to_dict(orient='records')
+
         # Submit the chunk to the Celery worker
-        celery_app.send_task('celery_worker.run_ensemble', args=[chunk])
+        celery_app.send_task('celery_worker.run_ensemble', args=[chunk_dict])
 
     pool.close()
     pool.join()
