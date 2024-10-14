@@ -144,7 +144,7 @@ def run_tests():
 
         # Run Incremental Scalability Test (Processing by chunks)
         logger.info("Running Incremental Scalability Test...")
-        scalability_metrics = run_incremental_scalability_test(progress_tracker, total_records)
+        scalability_metrics = run_incremental_scalability_test(progress_tracker, total_records, zookeeper_process, kafka_process, celery_process)
 
         # Ensure the progress process is stopped
         progress_process.join()
@@ -161,7 +161,7 @@ def run_tests():
         if zookeeper_process:
             stop_process(zookeeper_process, "Zookeeper")
 
-def run_incremental_scalability_test(progress_tracker, total_records):
+def run_incremental_scalability_test(progress_tracker, total_records, zookeeper_process, kafka_process, celery_process):
     """Run the scalability test in increments and restart the system between each chunk."""
     model = EnsembleModel()
     dataset_path = 'data/cleaned_data_full.csv'
@@ -198,7 +198,7 @@ def run_incremental_scalability_test(progress_tracker, total_records):
         logger.info(f"Chunk {i} processed. Resetting system for the next chunk...")
 
         # Stop and reset the system before processing the next chunk
-        stop_system_services()
+        stop_system_services(zookeeper_process, kafka_process, celery_process)
         zookeeper_process, kafka_process, celery_process = reset_system()
 
     # Calculate final metrics
@@ -218,9 +218,9 @@ def run_incremental_scalability_test(progress_tracker, total_records):
         'total_records': total_records.value
     }
 
-def stop_system_services():
+def stop_system_services(zookeeper_process, kafka_process, celery_process):
     """Stop the running Zookeeper, Kafka, and Celery services."""
-    # Gracefully stop Celery, Kafka, and Zookeeper before processing the next chunk
+    # Gracefully stop Celery, Kafka, and Zookeeper
     stop_process(celery_process, "Celery")
     stop_process(kafka_process, "Kafka")
     stop_process(zookeeper_process, "Zookeeper")
