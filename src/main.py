@@ -1,17 +1,30 @@
-import multiprocessing as mp
-from run_scalability_test import run_real_time_test
+import os
+from src.ensemble_model import EnsembleModel
+from src.cmas_agents import DataCollectionAgent
+from ids_ips.integration import IDSIPS
+from kafka_broker import KafkaBroker
 from src.utils.logger import get_logger
+from real_time_data_ingestion import start_real_time_ingestion
 
-logger = get_logger('Main')
+logger = get_logger("MainLogger")
+
+def main():
+    logger.info("Starting BustedURL system...")
+
+    # Initialize the ensemble model
+    model = EnsembleModel()
+
+    # Start real-time data ingestion
+    real_time_data_agent = DataCollectionAgent()
+    start_real_time_ingestion(real_time_data_agent)
+
+    # Start IDS/IPS system
+    ids_ips = IDSIPS(threshold=0.85)
+    
+    # Kafka Broker
+    kafka = KafkaBroker()
+    
+    logger.info("System is now running in real-time mode.")
 
 if __name__ == "__main__":
-    logger.info("Starting BustedURL system with real-time processing...")
-    
-    # Create process for real-time testing
-    real_time_test_process = mp.Process(target=run_real_time_test)
-
-    # Start the real-time testing
-    real_time_test_process.start()
-
-    # Join the processes to wait for completion (if necessary)
-    real_time_test_process.join()
+    main()
