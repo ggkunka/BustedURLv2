@@ -1,0 +1,11 @@
+kafka-python
+celery
+redis
+pandas
+scikit-learn
+transformers
+torch
+tensorflow
+psutil
+numpy
+loguru
