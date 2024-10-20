@@ -9,3 +9,6 @@ tensorflow
 psutil
 numpy
 loguru
+tweepy
+hdfs
+requests
