@@ -1,6 +1,5 @@
 import time
 import requests
-import tweepy
 # from hdfs import InsecureClient  # HDFS client for Python (Commented out for debugging)
 from kafka_broker import send_message
 from src.utils.logger import get_logger
@@ -18,17 +17,7 @@ class RealTimeDataIngestion:
     def __init__(self):
         self.logger = get_logger('RealTimeDataIngestion')
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)  # Redis to track processed URLs
-        self.twitter_api = self.initialize_twitter_api()
-        # self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client (Commented for debugging)
-
-    def initialize_twitter_api(self):
-        """Initialize the Twitter API client using tweepy for real-time phishing URL collection."""
-        api_key = "WkKQ8cFA339cChOqvNUGMhhcK"
-        api_secret_key = "zP2oMAtczJBP0vzMk9uZBK0FZwLrVTPrbec5bxKsN744SPajIU"
-        bearer_token = "AAAAAAAAAAAAAAAAAAAAAM0SwgEAAAAAxNMwKISnaTiC5gTcAkC%2BWlZ7BeQ%3DnogCPmrZ1JWB1ob8Eg77ASpR0Uoyup234kyWGItOwQv39rVM2X"
-        
-        client = tweepy.Client(bearer_token=bearer_token)
-        return client
+        # self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client
 
     def is_new_url(self, url):
         """Check if the URL has been processed before."""
@@ -58,7 +47,6 @@ class RealTimeDataIngestion:
                 if self.is_new_url(url):
                     self.logger.info(f"Collected new URL from OpenPhish: {url}")
                     send_message('real_time_urls', {'url': url})
-                    # self.append_to_hdfs(url)  # Commented out for debugging
                     self.mark_url_processed(url)
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from OpenPhish: {str(e)}")
@@ -75,7 +63,6 @@ class RealTimeDataIngestion:
                 if self.is_new_url(url) and url:  # Ensure URL is valid and non-empty
                     self.logger.info(f"Collected new URL from Cybercrime Tracker: {url}")
                     send_message('real_time_urls', {'url': url})
-                    # self.append_to_hdfs(url)  # Commented out for debugging
                     self.mark_url_processed(url)
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from Cybercrime Tracker: {str(e)}")
@@ -96,30 +83,48 @@ class RealTimeDataIngestion:
                         if self.is_new_url(url):
                             self.logger.info(f"Collected new URL from URLHaus: {url}")
                             send_message('real_time_urls', {'url': url})
-                            # self.append_to_hdfs(url)  # Commented out for debugging
                             self.mark_url_processed(url)
                 except IndexError:
                     self.logger.error("Error parsing URLHaus data")
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from URLHaus: {str(e)}")
 
-    def fetch_urls_from_twitter(self):
-        """Collect phishing URLs from Twitter using specific keywords and process new ones."""
+    def fetch_urls_from_rss_feeds(self):
+        """Collect phishing URLs from Malware Traffic Analysis RSS Feed."""
+        rss_feed_url = "https://www.malware-traffic-analysis.net/blog-entries.rss"
         try:
-            search_query = "phishing OR malware OR malicious URL filter:links"
-            tweets = self.twitter_api.search_recent_tweets(query=search_query, tweet_fields=['entities'], max_results=100)
-            
-            for tweet in tweets.data:
-                if 'urls' in tweet.entities:
-                    for url in tweet.entities['urls']:
-                        expanded_url = url['expanded_url']
-                        if self.is_new_url(expanded_url):
-                            self.logger.info(f"Collected new URL from Twitter: {expanded_url}")
-                            send_message('real_time_urls', {'url': expanded_url})
-                            #self.append_to_hdfs(expanded_url)  # Commented out for debugging
-                            self.mark_url_processed(expanded_url)
-        except Exception as e:
-            self.logger.error(f"Error fetching data from Twitter: {str(e)}")
+            response = requests.get(rss_feed_url, timeout=10)
+            response.raise_for_status()
+            urls = response.text.splitlines()  # Modify this based on actual RSS format
+
+            for url in urls:
+                if self.is_new_url(url):
+                    self.logger.info(f"Collected new URL from RSS Feed: {url}")
+                    send_message('real_time_urls', {'url': url})
+                    self.mark_url_processed(url)
+        except requests.RequestException as e:
+            self.logger.error(f"Error fetching data from RSS Feed: {str(e)}")
+
+    def fetch_urls_from_abuseipdb(self):
+        """Fetch malicious URLs from AbuseIPDB."""
+        api_url = "https://api.abuseipdb.com/api/v2/blacklist"
+        headers = {
+            'Accept': 'application/json',
+            'Key': '5999a5f9ad99fad0a5b31b20910a82470f52c02bb382ecbd041deb8f5e8c6a3bd7b2561fcefb49ec'
+        }
+        try:
+            response = requests.get(api_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            urls = [item['domain'] for item in data['data']]  # Modify based on AbuseIPDB response structure
+
+            for url in urls:
+                if self.is_new_url(url):
+                    self.logger.info(f"Collected new URL from AbuseIPDB: {url}")
+                    send_message('real_time_urls', {'url': url})
+                    self.mark_url_processed(url)
+        except requests.RequestException as e:
+            self.logger.error(f"Error fetching data from AbuseIPDB: {str(e)}")
 
     def fetch_urls_from_threatfox(self):
         """Fetch phishing URLs from ThreatFox and process new ones."""
@@ -137,7 +142,6 @@ class RealTimeDataIngestion:
                         if self.is_new_url(url):
                             self.logger.info(f"Collected new URL from ThreatFox: {url}")
                             send_message('real_time_urls', {'url': url})
-                            # self.append_to_hdfs(url)  # Commented out for debugging
                             self.mark_url_processed(url)
                 except IndexError:
                     self.logger.error("Error parsing ThreatFox data")
@@ -157,7 +161,8 @@ class RealTimeDataIngestion:
             self.fetch_phishing_urls_from_openphish()
             self.fetch_phishing_urls_from_cybercrime_tracker()
             self.fetch_phishing_urls_from_urlhaus()
-            self.fetch_urls_from_twitter()
+            self.fetch_urls_from_rss_feeds()  # New RSS feed-based URL collection
+            self.fetch_urls_from_abuseipdb()  # AbuseIPDB URL collection
             self.fetch_urls_from_threatfox()
 
             # Update local database (Hadoop commented out for debugging)
