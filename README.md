@@ -23,6 +23,7 @@
 This project is licensed under the **GNU General Public License v3.0**. See the [LICENSE](./LICENSE) file for more details.
 
 ## Dir Structure:
+```plaintext
 BustedURL/
 ├── README.md                          # Update with new features for real-time ingestion and incremental learning
 ├── requirements.txt                   # Add dependencies for HDFS, Redis, and Kafka
