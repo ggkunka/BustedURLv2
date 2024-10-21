@@ -56,8 +56,10 @@ class RealTimeDataIngestion:
 
             # Write collected URLs to a local temporary file
             with open(local_file, "w") as f:
-                for url in self.urls_to_store:
-                    f.write(f"{url}\n")
+                for entry in self.urls_to_store:
+                    url = entry['url']
+                    status = entry['status']
+                    f.write(f"{url}, {status}\n")  # Write URL and its status (malicious or benign)
 
             # Use the HDFS CLI to append the local file to the HDFS file
             cmd = f"hdfs dfs -appendToFile {local_file} {hdfs_path}"
@@ -88,8 +90,8 @@ class RealTimeDataIngestion:
             for url in urls:
                 if self.is_new_url(url):
                     self.logger.info(f"Collected new URL from OpenPhish: {url}")
-                    send_message('real_time_urls', {'url': url})
-                    self.urls_to_store.append(url)
+                    send_message('real_time_urls', {'url': url, 'status': 'malicious'})
+                    self.urls_to_store.append({'url': url, 'status': 'malicious'})
                     self.mark_url_processed(url)
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from OpenPhish: {str(e)}")
@@ -105,9 +107,11 @@ class RealTimeDataIngestion:
 
             for url in urls:
                 if self.is_new_url(url) and url:  # Ensure URL is valid and non-empty
+                    if not url.startswith("http://") and not url.startswith("https://"):
+                        url = "http://" + url  # Add the prefix if missing
                     self.logger.info(f"Collected new URL from Cybercrime Tracker: {url}")
-                    send_message('real_time_urls', {'url': url})
-                    self.urls_to_store.append(url)
+                    send_message('real_time_urls', {'url': url, 'status': 'malicious'})
+                    self.urls_to_store.append({'url': url, 'status': 'malicious'})
                     self.mark_url_processed(url)
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from Cybercrime Tracker: {str(e)}")
@@ -126,10 +130,11 @@ class RealTimeDataIngestion:
                     fields = line.split('","')  # Split by CSV format
                     if len(fields) > 2:  # Ensure we have enough fields
                         url = fields[2].replace('"', '')  # Extract URL field and remove quotes
+                        status = 'malicious' if fields[3] == 'online' else 'benign'  # Classify based on status
                         if self.is_new_url(url):
                             self.logger.info(f"Collected new URL from URLHaus: {url}")
-                            send_message('real_time_urls', {'url': url})
-                            self.urls_to_store.append(url)
+                            send_message('real_time_urls', {'url': url, 'status': status})
+                            self.urls_to_store.append({'url': url, 'status': status})
                             self.mark_url_processed(url)
                 except IndexError:
                     self.logger.error("Error parsing URLHaus data")
@@ -150,8 +155,8 @@ class RealTimeDataIngestion:
             for url in urls:
                 if self.is_new_url(url):
                     self.logger.info(f"Collected new URL from AbuseIPDB: {url}")
-                    send_message('real_time_urls', {'url': url})
-                    self.urls_to_store.append(url)
+                    send_message('real_time_urls', {'url': url, 'status': 'malicious'})
+                    self.urls_to_store.append({'url': url, 'status': 'malicious'})
                     self.mark_url_processed(url)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:
@@ -170,25 +175,10 @@ class RealTimeDataIngestion:
             self.logger.info("Starting new round of URL collection...")
 
             # Fetch phishing URLs from various sources
-            try:
-                self.fetch_phishing_urls_from_openphish()
-            except Exception as e:
-                self.logger.error(f"Error processing OpenPhish: {str(e)}")
-
-            try:
-                self.fetch_phishing_urls_from_cybercrime_tracker()
-            except Exception as e:
-                self.logger.error(f"Error processing Cybercrime Tracker: {str(e)}")
-
-            try:
-                self.fetch_phishing_urls_from_urlhaus()
-            except Exception as e:
-                self.logger.error(f"Error processing URLHaus: {str(e)}")
-
-            try:
-                self.fetch_urls_from_abuseipdb()
-            except Exception as e:
-                self.logger.error(f"Error processing AbuseIPDB: {str(e)}")
+            self.fetch_phishing_urls_from_openphish()
+            self.fetch_phishing_urls_from_cybercrime_tracker()
+            self.fetch_phishing_urls_from_urlhaus()
+            self.fetch_urls_from_abuseipdb()
 
             # Update local database (push to HDFS)
             self.update_local_db()
