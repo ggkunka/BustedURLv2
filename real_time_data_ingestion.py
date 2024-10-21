@@ -1,7 +1,7 @@
 import time
 import requests
 import tweepy
-# from hdfs import InsecureClient  # HDFS client for Python (Uncomment after testing)
+from hdfs import InsecureClient  # HDFS client for Python (Uncomment after testing)
 from kafka_broker import send_message
 from src.utils.logger import get_logger
 import redis
@@ -18,7 +18,7 @@ logging.basicConfig(
 
 class RealTimeDataIngestion:
     def __init__(self):
-        self.logger = get_logger('RealTimeDataIngestion', log_file='real_time_data_ingestion.log')
+        self.logger = get_logger('RealTimeDataIngestion')
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)  # Redis to track processed URLs
         self.twitter_api = self.initialize_twitter_api()
         self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client
@@ -41,23 +41,32 @@ class RealTimeDataIngestion:
         """Mark a URL as processed by adding it to Redis."""
         self.redis_client.set(url, 1)  # Store the URL
 
-    def append_to_hdfs_with_cli(self):
+    def append_to_hdfs(self):
+        """Append collected URLs to HDFS using HDFS CLI."""
         hdfs_path = "/phishing_urls/collected_urls.txt"
-        local_file = "/tmp/collected_urls.txt"  # Temporary file
+        local_file = "/tmp/collected_urls.txt"  # Temporary file to write URLs before appending
+
         try:
+            # Write collected URLs to a local temporary file
             with open(local_file, "w") as f:
                 for url in self.urls_to_store:
                     f.write(f"{url}\n")
-            # Use HDFS CLI to copy the file
+
+            # Use the HDFS CLI to append the local file to the HDFS file
             cmd = f"hdfs dfs -appendToFile {local_file} {hdfs_path}"
             subprocess.run(cmd, shell=True, check=True)
+
             self.logger.info(f"Appended {len(self.urls_to_store)} URLs to HDFS.")
-            os.remove(local_file)  # Clean up the temp file
+            
+            # Clean up the local temporary file after successfully appending
+            os.remove(local_file)
+
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error appending URLs to HDFS using CLI: {str(e)}")
         except Exception as e:
             self.logger.error(f"Unexpected error: {str(e)}")
         finally:
+            # Clear the URLs list after storing them in HDFS
             self.urls_to_store = []
 
     def fetch_phishing_urls_from_openphish(self):
