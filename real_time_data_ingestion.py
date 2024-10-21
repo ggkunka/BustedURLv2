@@ -119,7 +119,7 @@ class RealTimeDataIngestion:
                         if self.is_new_url(url):
                             self.logger.info(f"Collected new URL from URLHaus: {url}")
                             send_message('real_time_urls', {'url': url})
-                            # self.append_to_hdfs(url)  # Uncomment when writing to HDFS
+                            self.append_to_hdfs(url)  # Uncomment when writing to HDFS
                             self.mark_url_processed(url)
                 except IndexError:
                     self.logger.error("Error parsing URLHaus data")
