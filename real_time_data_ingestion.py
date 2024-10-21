@@ -19,7 +19,7 @@ class RealTimeDataIngestion:
         self.logger = get_logger('RealTimeDataIngestion')
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)  # Redis to track processed URLs
         self.twitter_api = self.initialize_twitter_api()
-        self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client
+        # self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client
 
     def initialize_twitter_api(self):
         """Initialize the Twitter API client using tweepy for real-time phishing URL collection."""
