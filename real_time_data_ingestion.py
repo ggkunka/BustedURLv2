@@ -1,6 +1,6 @@
 import time
 import requests
-# from hdfs import InsecureClient  # HDFS client for Python (Commented out for debugging)
+from hdfs import InsecureClient  # HDFS client for Python (Commented out for debugging)
 from kafka_broker import send_message
 from src.utils.logger import get_logger
 import redis
@@ -17,7 +17,7 @@ class RealTimeDataIngestion:
     def __init__(self):
         self.logger = get_logger('RealTimeDataIngestion')
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)  # Redis to track processed URLs
-        # self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client
+        self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client
 
     def is_new_url(self, url):
         """Check if the URL has been processed before."""
@@ -29,10 +29,10 @@ class RealTimeDataIngestion:
 
     def append_to_hdfs(self, url):
         """Append the new URL to a file in HDFS (Commented out for debugging)."""
-        # hdfs_path = "/phishing_urls/collected_urls.txt"
-        # with self.hdfs_client.write(hdfs_path, append=True, encoding='utf-8') as writer:
-        #     writer.write(f"{url}\n")
-        # self.logger.info(f"Appended URL to HDFS: {url}")
+        hdfs_path = "/phishing_urls/collected_urls.txt"
+        with self.hdfs_client.write(hdfs_path, append=True, encoding='utf-8') as writer:
+            writer.write(f"{url}\n")
+        self.logger.info(f"Appended URL to HDFS: {url}")
         pass
 
     def fetch_phishing_urls_from_openphish(self):
@@ -124,7 +124,7 @@ class RealTimeDataIngestion:
                 if self.is_new_url(url):
                     self.logger.info(f"Collected new URL/IP from AbuseIPDB: {url}")
                     send_message('real_time_urls', {'url': url})
-                    # self.append_to_hdfs(url)  # Commented out for debugging
+                    self.append_to_hdfs(url)  # Commented out for debugging
                     self.mark_url_processed(url)
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from AbuseIPDB: {str(e)}")
