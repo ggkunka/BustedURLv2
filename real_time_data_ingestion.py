@@ -55,22 +55,22 @@ class RealTimeDataIngestion:
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from OpenPhish: {str(e)}")
 
-    def fetch_phishing_urls_from_phishtank(self):
-        """Fetch phishing URLs from PhishTank and process new ones."""
-        api_url = "https://data.phishtank.com/data/online-valid.csv"
+    def fetch_phishing_urls_from_cybercrime_tracker(self):
+        """Fetch phishing URLs from Cybercrime Tracker and process new ones."""
+        api_url = "https://cybercrime-tracker.net/all.php"
         try:
             response = requests.get(api_url)
             response.raise_for_status()
             urls = response.text.splitlines()
 
-            for url in urls[1:]:
+            for url in urls:
                 if self.is_new_url(url):
-                    self.logger.info(f"Collected new URL from PhishTank: {url}")
+                    self.logger.info(f"Collected new URL from Cybercrime Tracker: {url}")
                     send_message('real_time_urls', {'url': url})
                     self.append_to_hdfs(url)  # Store URL in HDFS
                     self.mark_url_processed(url)
         except requests.RequestException as e:
-            self.logger.error(f"Error fetching data from PhishTank: {str(e)}")
+            self.logger.error(f"Error fetching data from Cybercrime Tracker: {str(e)}")
 
     def fetch_phishing_urls_from_urlhaus(self):
         """Fetch phishing URLs from URLHaus and process new ones."""
@@ -145,7 +145,7 @@ class RealTimeDataIngestion:
 
             # Fetch phishing URLs from various sources
             self.fetch_phishing_urls_from_openphish()
-            self.fetch_phishing_urls_from_phishtank()
+            self.fetch_phishing_urls_from_cybercrime_tracker()
             self.fetch_phishing_urls_from_urlhaus()
             self.fetch_urls_from_twitter()
             self.fetch_urls_from_dark_web()
