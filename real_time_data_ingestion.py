@@ -35,11 +35,17 @@ class RealTimeDataIngestion:
 
     def is_new_url(self, url):
         """Check if the URL has been processed before."""
-        return not self.redis_client.exists(url)
+        if not self.redis_client.exists(url):
+            self.logger.info(f"New URL detected: {url}")
+            return True
+        else:
+            self.logger.info(f"URL already processed: {url}")
+            return False
 
     def mark_url_processed(self, url):
         """Mark a URL as processed by adding it to Redis."""
-        self.redis_client.set(url, 1)  # Store the URL
+        self.redis_client.set(url, 1)  # Store the URL with an arbitrary value of 1
+        self.logger.info(f"URL marked as processed in Redis: {url}")
 
     def append_to_hdfs(self):
         """Append collected URLs to HDFS using HDFS CLI."""
@@ -59,7 +65,7 @@ class RealTimeDataIngestion:
                 for entry in self.urls_to_store:
                     url = entry['url']
                     status = entry['status']
-                    f.write(f"{url}, {status}\n")  # Write URL and its status (malicious or benign)
+                    f.write(f"{url}, {status}\n")  # Write URL and its status (0 for benign, 1 for malicious)
 
             # Use the HDFS CLI to append the local file to the HDFS file
             cmd = f"hdfs dfs -appendToFile {local_file} {hdfs_path}"
@@ -90,8 +96,8 @@ class RealTimeDataIngestion:
             for url in urls:
                 if self.is_new_url(url):
                     self.logger.info(f"Collected new URL from OpenPhish: {url}")
-                    send_message('real_time_urls', {'url': url, 'status': 'malicious'})
-                    self.urls_to_store.append({'url': url, 'status': 'malicious'})
+                    send_message('real_time_urls', {'url': url, 'status': 1})  # Mark as malicious (1)
+                    self.urls_to_store.append({'url': url, 'status': 1})
                     self.mark_url_processed(url)
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from OpenPhish: {str(e)}")
@@ -110,8 +116,8 @@ class RealTimeDataIngestion:
                     if not url.startswith("http://") and not url.startswith("https://"):
                         url = "http://" + url  # Add the prefix if missing
                     self.logger.info(f"Collected new URL from Cybercrime Tracker: {url}")
-                    send_message('real_time_urls', {'url': url, 'status': 'malicious'})
-                    self.urls_to_store.append({'url': url, 'status': 'malicious'})
+                    send_message('real_time_urls', {'url': url, 'status': 1})  # Mark as malicious (1)
+                    self.urls_to_store.append({'url': url, 'status': 1})
                     self.mark_url_processed(url)
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from Cybercrime Tracker: {str(e)}")
@@ -130,7 +136,7 @@ class RealTimeDataIngestion:
                     fields = line.split('","')  # Split by CSV format
                     if len(fields) > 2:  # Ensure we have enough fields
                         url = fields[2].replace('"', '')  # Extract URL field and remove quotes
-                        status = 'malicious' if fields[3] == 'online' else 'benign'  # Classify based on status
+                        status = 1 if fields[3] == 'online' else 0  # Mark as 1 for malicious, 0 for benign
                         if self.is_new_url(url):
                             self.logger.info(f"Collected new URL from URLHaus: {url}")
                             send_message('real_time_urls', {'url': url, 'status': status})
@@ -155,8 +161,8 @@ class RealTimeDataIngestion:
             for url in urls:
                 if self.is_new_url(url):
                     self.logger.info(f"Collected new URL from AbuseIPDB: {url}")
-                    send_message('real_time_urls', {'url': url, 'status': 'malicious'})
-                    self.urls_to_store.append({'url': url, 'status': 'malicious'})
+                    send_message('real_time_urls', {'url': url, 'status': 1})  # Mark as malicious (1)
+                    self.urls_to_store.append({'url': url, 'status': 1})
                     self.mark_url_processed(url)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:
