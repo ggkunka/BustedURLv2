@@ -106,25 +106,29 @@ class RealTimeDataIngestion:
             self.logger.error(f"Error fetching data from RSS Feed: {str(e)}")
 
     def fetch_urls_from_abuseipdb(self):
-        """Fetch malicious URLs from AbuseIPDB."""
+        """Fetch URLs or IPs from AbuseIPDB and process new ones."""
         api_url = "https://api.abuseipdb.com/api/v2/blacklist"
         headers = {
             'Accept': 'application/json',
             'Key': '5999a5f9ad99fad0a5b31b20910a82470f52c02bb382ecbd041deb8f5e8c6a3bd7b2561fcefb49ec'
         }
+        
         try:
             response = requests.get(api_url, headers=headers, timeout=10)
             response.raise_for_status()
             data = response.json()
-            urls = [item['domain'] for item in data['data']]  # Modify based on AbuseIPDB response structure
-
+    
+            # Extract IP addresses
+            urls = [item['ipAddress'] for item in data['data']]  # Based on the response structure
             for url in urls:
                 if self.is_new_url(url):
-                    self.logger.info(f"Collected new URL from AbuseIPDB: {url}")
+                    self.logger.info(f"Collected new URL/IP from AbuseIPDB: {url}")
                     send_message('real_time_urls', {'url': url})
+                    # self.append_to_hdfs(url)  # Commented out for debugging
                     self.mark_url_processed(url)
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from AbuseIPDB: {str(e)}")
+
 
     def fetch_urls_from_threatfox(self):
         """Fetch phishing URLs from ThreatFox and process new ones."""
