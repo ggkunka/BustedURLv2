@@ -64,7 +64,7 @@ class RealTimeDataIngestion:
             urls = response.text.splitlines()
 
             for url in urls:
-                if self.is_new_url(url):
+                if self.is_new_url(url) and url:  # Ensure URL is valid and non-empty
                     self.logger.info(f"Collected new URL from Cybercrime Tracker: {url}")
                     send_message('real_time_urls', {'url': url})
                     self.append_to_hdfs(url)  # Store URL in HDFS
@@ -80,13 +80,18 @@ class RealTimeDataIngestion:
             response.raise_for_status()
             urls = response.text.splitlines()
 
-            for line in urls[9:]:
-                url = line.split(",")[2].replace('"', '')
-                if self.is_new_url(url):
-                    self.logger.info(f"Collected new URL from URLHaus: {url}")
-                    send_message('real_time_urls', {'url': url})
-                    self.append_to_hdfs(url)  # Store URL in HDFS
-                    self.mark_url_processed(url)
+            for line in urls[9:]:  # Skip header
+                try:
+                    fields = line.split(",")
+                    if len(fields) > 2:  # Ensure we have enough fields
+                        url = fields[2].replace('"', '')
+                        if self.is_new_url(url):
+                            self.logger.info(f"Collected new URL from URLHaus: {url}")
+                            send_message('real_time_urls', {'url': url})
+                            self.append_to_hdfs(url)  # Store URL in HDFS
+                            self.mark_url_processed(url)
+                except IndexError:
+                    self.logger.error("Error parsing URLHaus data")
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from URLHaus: {str(e)}")
 
