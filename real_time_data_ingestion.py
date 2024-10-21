@@ -6,6 +6,8 @@ from kafka_broker import send_message
 from src.utils.logger import get_logger
 import redis
 import logging
+import subprocess
+import os
 
 # Configure logging to write to a file
 logging.basicConfig(
@@ -39,19 +41,24 @@ class RealTimeDataIngestion:
         """Mark a URL as processed by adding it to Redis."""
         self.redis_client.set(url, 1)  # Store the URL
 
-    def append_to_hdfs(self):
-        """Append collected URLs to HDFS."""
+    def append_to_hdfs_with_cli(self):
         hdfs_path = "/phishing_urls/collected_urls.txt"
-        if self.urls_to_store:
-            try:
-                with self.hdfs_client.write(hdfs_path, append=True, encoding='utf-8') as writer:
-                    for url in self.urls_to_store:
-                        writer.write(f"{url}\n")
-                    self.logger.info(f"Appended {len(self.urls_to_store)} URLs to HDFS.")
-            except Exception as e:
-                self.logger.error(f"Error appending URLs to HDFS: {str(e)}")
-            finally:
-                self.urls_to_store = []  # Clear after writing to HDFS
+        local_file = "/tmp/collected_urls.txt"  # Temporary file
+        try:
+            with open(local_file, "w") as f:
+                for url in self.urls_to_store:
+                    f.write(f"{url}\n")
+            # Use HDFS CLI to copy the file
+            cmd = f"hdfs dfs -appendToFile {local_file} {hdfs_path}"
+            subprocess.run(cmd, shell=True, check=True)
+            self.logger.info(f"Appended {len(self.urls_to_store)} URLs to HDFS.")
+            os.remove(local_file)  # Clean up the temp file
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Error appending URLs to HDFS using CLI: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {str(e)}")
+        finally:
+            self.urls_to_store = []
 
     def fetch_phishing_urls_from_openphish(self):
         """Fetch phishing URLs from OpenPhish and process new ones."""
