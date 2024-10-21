@@ -80,6 +80,7 @@ class RealTimeDataIngestion:
         """Fetch phishing URLs from OpenPhish and process new ones."""
         api_url = "https://openphish.com/feed.txt"
         try:
+            self.logger.info("Fetching data from OpenPhish...")
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
@@ -97,6 +98,7 @@ class RealTimeDataIngestion:
         """Fetch phishing URLs from Cybercrime Tracker and process new ones."""
         api_url = "https://cybercrime-tracker.net/all.php"
         try:
+            self.logger.info("Fetching data from Cybercrime Tracker...")
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
@@ -114,6 +116,7 @@ class RealTimeDataIngestion:
         """Fetch phishing URLs from URLHaus and process new ones."""
         api_url = "https://urlhaus.abuse.ch/downloads/csv_recent/"
         try:
+            self.logger.info("Fetching data from URLHaus...")
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
@@ -138,6 +141,7 @@ class RealTimeDataIngestion:
         api_url = "https://api.abuseipdb.com/api/v2/blacklist"
         headers = {'Key': '5999a5f9ad99fad0a5b31b20910a82470f52c02bb382ecbd041deb8f5e8c6a3bd7b2561fcefb49ec'}
         try:
+            self.logger.info("Fetching data from AbuseIPDB...")
             response = requests.get(api_url, headers=headers, timeout=10)
             response.raise_for_status()
             data = response.json()
@@ -166,10 +170,25 @@ class RealTimeDataIngestion:
             self.logger.info("Starting new round of URL collection...")
 
             # Fetch phishing URLs from various sources
-            self.fetch_phishing_urls_from_openphish()
-            self.fetch_phishing_urls_from_cybercrime_tracker()
-            self.fetch_phishing_urls_from_urlhaus()
-            self.fetch_urls_from_abuseipdb()
+            try:
+                self.fetch_phishing_urls_from_openphish()
+            except Exception as e:
+                self.logger.error(f"Error processing OpenPhish: {str(e)}")
+
+            try:
+                self.fetch_phishing_urls_from_cybercrime_tracker()
+            except Exception as e:
+                self.logger.error(f"Error processing Cybercrime Tracker: {str(e)}")
+
+            try:
+                self.fetch_phishing_urls_from_urlhaus()
+            except Exception as e:
+                self.logger.error(f"Error processing URLHaus: {str(e)}")
+
+            try:
+                self.fetch_urls_from_abuseipdb()
+            except Exception as e:
+                self.logger.error(f"Error processing AbuseIPDB: {str(e)}")
 
             # Update local database (push to HDFS)
             self.update_local_db()
