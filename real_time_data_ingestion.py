@@ -16,21 +16,18 @@ logging.basicConfig(
 
 class RealTimeDataIngestion:
     def __init__(self):
-        self.logger = get_logger('RealTimeDataIngestion')
+        self.logger = get_logger('RealTimeDataIngestion', log_file='real_time_data_ingestion.log')
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)  # Redis to track processed URLs
         self.twitter_api = self.initialize_twitter_api()
-        # self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client (Commented out)
+        self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client
 
     def initialize_twitter_api(self):
         """Initialize the Twitter API client using tweepy for real-time phishing URL collection."""
-        api_key = "v6h75p0IjhR8v2xd9V5BX4wpM"
-        api_secret_key = "RioroY0Acch98RltHO2y82usI4ZHHYCCoUg046y7zviLOVg4H2"
-        access_token = "1848124391634456576-TTbIggZDA3u8IuuY6oIHFWleyUpSOl"
-        access_token_secret = "7xzzBy2KpgJy7ZLL2EgJQF2aI0FMpkKxDzoqSpf56wDol"
-        bearer_token = "AAAAAAAAAAAAAAAAAAAAAC4QwgEAAAAAuK0bnMcv7iq9jRdGX7G89US%2BzM4%3D2Oal6IUOqUhcOhd6j6P444hR2sYInTXsVCS7ULQ2itvvAIlLYg"
+        api_key = "GFuzyaJ9WbXM2GyLGomXsyEAh"
+        api_secret_key = "IEP3mGepl2zUVQsau3TyXz6mhV7bdreLamPKbdwcyEDAe2azMs"
+        bearer_token = "AAAAAAAAAAAAAAAAAAAAAM0SwgEAAAAAb%2FNx6I6JHcAtwIHNF8ZQXHCMP%2F0%3DHyiBs0bdHfkfdiOSPJORHG51NNFtooVNdvqcPab9Ua3QnBsJLK"
         
-        client = tweepy.Client(bearer_token=bearer_token, consumer_key=api_key, consumer_secret=api_secret_key,
-                               access_token=access_token, access_token_secret=access_token_secret)
+        client = tweepy.Client(bearer_token=bearer_token)
         return client
 
     def is_new_url(self, url):
@@ -110,22 +107,23 @@ class RealTimeDataIngestion:
         """Collect phishing URLs from Twitter using specific keywords and process new ones."""
         try:
             search_query = "phishing OR malware OR malicious URL filter:links"
-            tweets = self.twitter_api.search_recent_tweets(query=search_query, max_results=100)
+            tweets = self.twitter_api.search_recent_tweets(query=search_query, tweet_fields=['entities'], max_results=100)
             
             for tweet in tweets.data:
-                for url in tweet.entities['urls']:
-                    expanded_url = url['expanded_url']
-                    if self.is_new_url(expanded_url):
-                        self.logger.info(f"Collected new URL from Twitter: {expanded_url}")
-                        send_message('real_time_urls', {'url': expanded_url})
-                        # self.append_to_hdfs(expanded_url)  # Commented out for debugging
-                        self.mark_url_processed(expanded_url)
+                if 'urls' in tweet.entities:
+                    for url in tweet.entities['urls']:
+                        expanded_url = url['expanded_url']
+                        if self.is_new_url(expanded_url):
+                            self.logger.info(f"Collected new URL from Twitter: {expanded_url}")
+                            send_message('real_time_urls', {'url': expanded_url})
+                            #self.append_to_hdfs(expanded_url)  # Commented out for debugging
+                            self.mark_url_processed(expanded_url)
         except Exception as e:
             self.logger.error(f"Error fetching data from Twitter: {str(e)}")
 
     def fetch_urls_from_threatfox(self):
-        """Collect phishing and malicious URLs from ThreatFox API and process new ones."""
-        api_url = "https://threatfox.abuse.ch/export/csv/"
+        """Fetch phishing URLs from ThreatFox and process new ones."""
+        api_url = "https://threatfox.abuse.ch/export/csv/urls/recent/"
         try:
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
