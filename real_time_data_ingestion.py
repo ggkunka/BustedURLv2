@@ -5,10 +5,14 @@ import tweepy
 from kafka_broker import send_message
 from src.utils.logger import get_logger
 import redis
+import logging
+
+# Configure the logger to show only INFO level messages and above
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 class RealTimeDataIngestion:
     def __init__(self):
-        self.logger = get_logger('RealTimeDataIngestion', level="INFO")
+        self.logger = get_logger('RealTimeDataIngestion')
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)  # Redis to track processed URLs
         self.twitter_api = self.initialize_twitter_api()
         # self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client (Commented out)
@@ -45,7 +49,6 @@ class RealTimeDataIngestion:
         """Fetch phishing URLs from OpenPhish and process new ones."""
         api_url = "https://openphish.com/feed.txt"
         try:
-            self.logger.debug("Fetching data from OpenPhish...")
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
@@ -53,7 +56,6 @@ class RealTimeDataIngestion:
             for url in urls:
                 if self.is_new_url(url):
                     self.logger.info(f"Collected new URL from OpenPhish: {url}")
-                    print(f"OpenPhish URL: {url}")  # Debug print
                     send_message('real_time_urls', {'url': url})
                     # self.append_to_hdfs(url)  # Commented out for debugging
                     self.mark_url_processed(url)
@@ -64,7 +66,6 @@ class RealTimeDataIngestion:
         """Fetch phishing URLs from Cybercrime Tracker and process new ones."""
         api_url = "https://cybercrime-tracker.net/all.php"
         try:
-            self.logger.debug("Fetching data from Cybercrime Tracker...")
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
@@ -72,7 +73,6 @@ class RealTimeDataIngestion:
             for url in urls:
                 if self.is_new_url(url) and url:  # Ensure URL is valid and non-empty
                     self.logger.info(f"Collected new URL from Cybercrime Tracker: {url}")
-                    print(f"Cybercrime Tracker URL: {url}")  # Debug print
                     send_message('real_time_urls', {'url': url})
                     # self.append_to_hdfs(url)  # Commented out for debugging
                     self.mark_url_processed(url)
@@ -83,7 +83,6 @@ class RealTimeDataIngestion:
         """Fetch phishing URLs from URLHaus and process new ones."""
         api_url = "https://urlhaus.abuse.ch/downloads/csv/"
         try:
-            self.logger.debug("Fetching data from URLHaus...")
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
@@ -95,7 +94,6 @@ class RealTimeDataIngestion:
                         url = fields[2].replace('"', '')
                         if self.is_new_url(url):
                             self.logger.info(f"Collected new URL from URLHaus: {url}")
-                            print(f"URLHaus URL: {url}")  # Debug print
                             send_message('real_time_urls', {'url': url})
                             # self.append_to_hdfs(url)  # Commented out for debugging
                             self.mark_url_processed(url)
@@ -107,7 +105,6 @@ class RealTimeDataIngestion:
     def fetch_urls_from_twitter(self):
         """Collect phishing URLs from Twitter using specific keywords and process new ones."""
         try:
-            self.logger.debug("Fetching data from Twitter...")
             search_query = "phishing OR malware OR malicious URL filter:links"
             tweets = self.twitter_api.search_recent_tweets(query=search_query, max_results=100)
             
@@ -116,7 +113,6 @@ class RealTimeDataIngestion:
                     expanded_url = url['expanded_url']
                     if self.is_new_url(expanded_url):
                         self.logger.info(f"Collected new URL from Twitter: {expanded_url}")
-                        print(f"Twitter URL: {expanded_url}")  # Debug print
                         send_message('real_time_urls', {'url': expanded_url})
                         # self.append_to_hdfs(expanded_url)  # Commented out for debugging
                         self.mark_url_processed(expanded_url)
@@ -127,7 +123,6 @@ class RealTimeDataIngestion:
         """Collect phishing and malicious URLs from ThreatFox API and process new ones."""
         api_url = "https://threatfox.abuse.ch/export/csv/"
         try:
-            self.logger.debug("Fetching data from ThreatFox...")
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
@@ -139,7 +134,6 @@ class RealTimeDataIngestion:
                         url = fields[1].replace('"', '')
                         if self.is_new_url(url):
                             self.logger.info(f"Collected new URL from ThreatFox: {url}")
-                            print(f"ThreatFox URL: {url}")  # Debug print
                             send_message('real_time_urls', {'url': url})
                             # self.append_to_hdfs(url)  # Commented out for debugging
                             self.mark_url_processed(url)
