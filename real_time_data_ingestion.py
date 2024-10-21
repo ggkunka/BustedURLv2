@@ -19,13 +19,13 @@ class RealTimeDataIngestion:
         self.logger = get_logger('RealTimeDataIngestion')
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)  # Redis to track processed URLs
         self.twitter_api = self.initialize_twitter_api()
-        # self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client
+        # self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client (Commented for debugging)
 
     def initialize_twitter_api(self):
         """Initialize the Twitter API client using tweepy for real-time phishing URL collection."""
-        api_key = "GFuzyaJ9WbXM2GyLGomXsyEAh"
-        api_secret_key = "IEP3mGepl2zUVQsau3TyXz6mhV7bdreLamPKbdwcyEDAe2azMs"
-        bearer_token = "AAAAAAAAAAAAAAAAAAAAAM0SwgEAAAAAb%2FNx6I6JHcAtwIHNF8ZQXHCMP%2F0%3DHyiBs0bdHfkfdiOSPJORHG51NNFtooVNdvqcPab9Ua3QnBsJLK"
+        api_key = "WkKQ8cFA339cChOqvNUGMhhcK"
+        api_secret_key = "zP2oMAtczJBP0vzMk9uZBK0FZwLrVTPrbec5bxKsN744SPajIU"
+        bearer_token = "AAAAAAAAAAAAAAAAAAAAAM0SwgEAAAAAxNMwKISnaTiC5gTcAkC%2BWlZ7BeQ%3DnogCPmrZ1JWB1ob8Eg77ASpR0Uoyup234kyWGItOwQv39rVM2X"
         
         client = tweepy.Client(bearer_token=bearer_token)
         return client
