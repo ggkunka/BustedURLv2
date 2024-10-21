@@ -1,7 +1,7 @@
 import time
 import requests
 import tweepy
-from hdfs import InsecureClient  # HDFS client for Python (Uncomment after testing)
+from hdfs import InsecureClient  # HDFS client for Python
 from kafka_broker import send_message
 from src.utils.logger import get_logger
 import redis
@@ -47,6 +47,13 @@ class RealTimeDataIngestion:
         local_file = "/tmp/collected_urls.txt"  # Temporary file to write URLs before appending
 
         try:
+            # Log the URLs being appended
+            self.logger.info(f"URLs to append: {self.urls_to_store}")
+
+            if not self.urls_to_store:
+                self.logger.info("No new URLs to append.")
+                return  # Skip appending if no URLs are available
+
             # Write collected URLs to a local temporary file
             with open(local_file, "w") as f:
                 for url in self.urls_to_store:
@@ -119,7 +126,7 @@ class RealTimeDataIngestion:
                         if self.is_new_url(url):
                             self.logger.info(f"Collected new URL from URLHaus: {url}")
                             send_message('real_time_urls', {'url': url})
-                            self.append_to_hdfs(url)  # Uncomment when writing to HDFS
+                            self.urls_to_store.append(url)
                             self.mark_url_processed(url)
                 except IndexError:
                     self.logger.error("Error parsing URLHaus data")
