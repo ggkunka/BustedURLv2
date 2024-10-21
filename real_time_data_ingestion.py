@@ -99,7 +99,7 @@ class RealTimeDataIngestion:
         """Collect phishing URLs from Twitter using specific keywords and process new ones."""
         try:
             search_query = "phishing OR malware OR malicious URL filter:links"
-            tweets = self.twitter_api.search_recent_tweets(q=search_query, count=100, result_type="recent", lang="en")
+            tweets = self.twitter_api.search_tweets(q=search_query, count=100, result_type="recent", lang="en")
             
             for tweet in tweets:
                 for url in tweet.entities['urls']:
@@ -112,32 +112,28 @@ class RealTimeDataIngestion:
         except Exception as e:
             self.logger.error(f"Error fetching data from Twitter: {str(e)}")
 
-    def fetch_urls_from_dark_web(self):
-        """Collect URLs from the dark web via DarkOwl API (or similar service) and process new ones."""
-        api_url = "https://api.darkowl.com/dark-intel/search"
-        headers = {
-            'Authorization': 'Bearer YOUR_DARKOWL_API_TOKEN',
-            'Content-Type': 'application/json',
-        }
-        payload = {
-            "query": "phishing OR malware",
-            "limit": 100
-        }
-        
+    def fetch_urls_from_threatfox(self):
+        """Collect phishing and malicious URLs from ThreatFox API and process new ones."""
+        api_url = "https://threatfox.abuse.ch/export/csv/"
         try:
-            response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+            response = requests.get(api_url, timeout=10)
             response.raise_for_status()
-            data = response.json()
-            urls = [item['url'] for item in data['data'] if 'url' in item]
+            urls = response.text.splitlines()
 
-            for url in urls:
-                if self.is_new_url(url):
-                    self.logger.info(f"Collected new URL from Dark Web: {url}")
-                    send_message('real_time_urls', {'url': url})
-                    self.append_to_hdfs(url)  # Store URL in HDFS
-                    self.mark_url_processed(url)
+            for line in urls[1:]:  # Skip header
+                try:
+                    fields = line.split(",")
+                    if len(fields) > 1:  # Ensure we have enough fields
+                        url = fields[1].replace('"', '')
+                        if self.is_new_url(url):
+                            self.logger.info(f"Collected new URL from ThreatFox: {url}")
+                            send_message('real_time_urls', {'url': url})
+                            self.append_to_hdfs(url)  # Store URL in HDFS
+                            self.mark_url_processed(url)
+                except IndexError:
+                    self.logger.error("Error parsing ThreatFox data")
         except requests.RequestException as e:
-            self.logger.error(f"Error fetching data from Dark Web: {str(e)}")
+            self.logger.error(f"Error fetching data from ThreatFox: {str(e)}")
 
     def update_local_db(self):
         """Update local database by sending URLs to Kafka and storing them in HDFS."""
@@ -153,7 +149,7 @@ class RealTimeDataIngestion:
             self.fetch_phishing_urls_from_cybercrime_tracker()
             self.fetch_phishing_urls_from_urlhaus()
             self.fetch_urls_from_twitter()
-            self.fetch_urls_from_dark_web()
+            self.fetch_urls_from_threatfox()
 
             # Update local database
             self.update_local_db()
