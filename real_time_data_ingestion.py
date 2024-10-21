@@ -105,7 +105,7 @@ class RealTimeDataIngestion:
 
     def fetch_phishing_urls_from_urlhaus(self):
         """Fetch phishing URLs from URLHaus and process new ones."""
-        api_url = "https://urlhaus.abuse.ch/downloads/csv/"
+        api_url = "https://urlhaus.abuse.ch/downloads/csv_recent/"
         try:
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
