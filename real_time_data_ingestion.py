@@ -16,7 +16,7 @@ logging.basicConfig(
 
 class RealTimeDataIngestion:
     def __init__(self):
-        self.logger = get_logger('RealTimeDataIngestion', log_file='real_time_data_ingestion.log')
+        self.logger = get_logger('RealTimeDataIngestion')
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)  # Redis to track processed URLs
         self.twitter_api = self.initialize_twitter_api()
         self.hdfs_client = InsecureClient('http://localhost:9000', user='hadoop_user')  # HDFS client
