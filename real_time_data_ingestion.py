@@ -7,8 +7,12 @@ from src.utils.logger import get_logger
 import redis
 import logging
 
-# Configure the logger to show only INFO level messages and above
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Configure logging to write to a file instead of console
+logging.basicConfig(
+    filename='real_time_data_ingestion.log',  # Log file name
+    level=logging.INFO,  # Log level
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 class RealTimeDataIngestion:
     def __init__(self):
