@@ -33,30 +33,35 @@ class EnsembleModel:
         )
 
     def extract_features(self, url):
+        """Extract features using transformer models."""
         inputs = torch.tensor([url])  # Preprocess URL into tensor
         embeddings = [model(inputs).last_hidden_state for model in self.transformer_models]
         combined_embeddings = torch.cat(embeddings, dim=1)  # Concatenate embeddings from all models
         return combined_embeddings
 
     def classify(self, features):
+        """Classify the features into labels."""
         return self.stacking_classifier.predict(features)
 
     def classify_proba(self, features):
         """Return the probability estimates for the classes."""
         return self.stacking_classifier.predict_proba(features)
 
-    def process_urls_in_parallel(self, url_list):
-        with Pool() as pool:
-            results = pool.map(self.process_single_url, url_list)
-        return results
-
     def process_single_url(self, url):
+        """Process a single URL: extract features and classify."""
         features = self.extract_features(url)
         prediction = self.classify(features)
-        return (url, prediction)
+        return features, prediction
+
+    def process_urls_in_parallel(self, url_list):
+        """Process URLs in parallel using multiprocessing."""
+        with Pool() as pool:
+            results = pool.map(self.process_single_url, url_list)
+        features_list, predictions = zip(*results)
+        return features_list, predictions
 
     def calculate_metrics(self, y_true, y_pred, y_pred_proba):
-        """Calculate accuracy, precision, recall, F1, ROC AUC, and confusion matrix."""
+        """Calculate various evaluation metrics."""
         accuracy = accuracy_score(y_true, y_pred)
         precision = precision_score(y_true, y_pred, average='binary')
         recall = recall_score(y_true, y_pred, average='binary')
@@ -87,15 +92,28 @@ class EnsembleModel:
         }
 
     def evaluate_on_test_data(self, test_data):
-        """Evaluate model on test data and calculate all metrics."""
+        """Evaluate the model on test data and calculate all metrics."""
         y_true = test_data['label']
         url_list = test_data['url'].tolist()
 
         # Parallel processing of URLs
-        features_list = self.process_urls_in_parallel(url_list)
-        y_pred = [self.classify(features) for features in features_list]
+        features_list, y_pred = self.process_urls_in_parallel(url_list)
         y_pred_proba = [self.classify_proba(features) for features in features_list]
 
         # Calculate metrics
         metrics = self.calculate_metrics(y_true, y_pred, y_pred_proba)
         return metrics
+
+    def train_on_batch(self, X, y):
+        """Train on a new batch of data."""
+        self.stacking_classifier.fit(X, y)
+
+    def save_model(self, path="models/ensemble_model.pkl"):
+        """Save the trained model to disk."""
+        import joblib
+        joblib.dump(self.stacking_classifier, path)
+
+    def load_model(self, path="models/ensemble_model.pkl"):
+        """Load a saved model from disk."""
+        import joblib
+        self.stacking_classifier = joblib.load(path)
