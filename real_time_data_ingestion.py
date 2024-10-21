@@ -42,7 +42,7 @@ class RealTimeDataIngestion:
         """Fetch phishing URLs from OpenPhish and process new ones."""
         api_url = "https://openphish.com/feed.txt"
         try:
-            response = requests.get(api_url)
+            response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
 
@@ -59,7 +59,7 @@ class RealTimeDataIngestion:
         """Fetch phishing URLs from Cybercrime Tracker and process new ones."""
         api_url = "https://cybercrime-tracker.net/all.php"
         try:
-            response = requests.get(api_url)
+            response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
 
@@ -76,7 +76,7 @@ class RealTimeDataIngestion:
         """Fetch phishing URLs from URLHaus and process new ones."""
         api_url = "https://urlhaus.abuse.ch/downloads/csv/"
         try:
-            response = requests.get(api_url)
+            response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
 
@@ -99,7 +99,7 @@ class RealTimeDataIngestion:
         """Collect phishing URLs from Twitter using specific keywords and process new ones."""
         try:
             search_query = "phishing OR malware OR malicious URL filter:links"
-            tweets = self.twitter_api.search(q=search_query, count=100, result_type="recent", lang="en")
+            tweets = self.twitter_api.search_recent_tweets(q=search_query, count=100, result_type="recent", lang="en")
             
             for tweet in tweets:
                 for url in tweet.entities['urls']:
@@ -125,7 +125,7 @@ class RealTimeDataIngestion:
         }
         
         try:
-            response = requests.post(api_url, json=payload, headers=headers)
+            response = requests.post(api_url, json=payload, headers=headers, timeout=10)
             response.raise_for_status()
             data = response.json()
             urls = [item['url'] for item in data['data'] if 'url' in item]
