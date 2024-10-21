@@ -110,16 +110,16 @@ class RealTimeDataIngestion:
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
             urls = response.text.splitlines()
-
-            for line in urls[9:]:  # Skip header
+    
+            for line in urls[9:]:  # Skip header and comments
                 try:
-                    fields = line.split(",")
-                    if len(fields) > 2:
-                        url = fields[2].replace('"', '').encode('utf-8', 'ignore').decode('utf-8')
+                    fields = line.split('","')  # Split by CSV format
+                    if len(fields) > 2:  # Ensure we have enough fields
+                        url = fields[2].replace('"', '')  # Extract URL field and remove quotes
                         if self.is_new_url(url):
                             self.logger.info(f"Collected new URL from URLHaus: {url}")
                             send_message('real_time_urls', {'url': url})
-                            self.urls_to_store.append(url)
+                            # self.append_to_hdfs(url)  # Uncomment when writing to HDFS
                             self.mark_url_processed(url)
                 except IndexError:
                     self.logger.error("Error parsing URLHaus data")
