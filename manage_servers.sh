@@ -1,93 +1,67 @@
 #!/bin/bash
 
-# Define paths to configurations and executables
-ZOOKEEPER_CONFIG="/home/yzhang10/kafka/config/zookeeper.properties"
-KAFKA_CONFIG="/home/yzhang10/kafka/config/server.properties"
-REDIS_CONFIG="/home/yzhang10/redis-stable/redis.conf"
-REDIS_SERVER="/home/yzhang10/redis-stable/src/redis-server"
-CELERY_WORKER_PATH="/home/yzhang10/BustedURLv2/celery_worker.py"
-
+# Define function to start servers
 start_zookeeper() {
     echo "Starting Zookeeper..."
-    /home/yzhang10/kafka/bin/zookeeper-server-start.sh $ZOOKEEPER_CONFIG &
-    sleep 5
+    /home/yzhang10/kafka/bin/zookeeper-server-start.sh /home/yzhang10/kafka/config/zookeeper.properties > /dev/null 2>&1 &
+    ZOOKEEPER_PID=$!
+    echo "Zookeeper started with PID $ZOOKEEPER_PID."
+    sleep 10
 }
 
 start_kafka() {
     echo "Starting Kafka..."
-    /home/yzhang10/kafka/bin/kafka-server-start.sh $KAFKA_CONFIG &
-    sleep 5
-}
-
-start_redis() {
-    echo "Starting Redis..."
-    $REDIS_SERVER $REDIS_CONFIG &
-    sleep 5
+    /home/yzhang10/kafka/bin/kafka-server-start.sh /home/yzhang10/kafka/config/server.properties > /dev/null 2>&1 &
+    KAFKA_PID=$!
+    echo "Kafka started with PID $KAFKA_PID."
+    sleep 10
 }
 
 start_celery() {
     echo "Starting Celery worker..."
-    celery -A $CELERY_WORKER_PATH worker --loglevel=info &
+    celery -A celery_worker worker --loglevel=info > /dev/null 2>&1 &
+    CELERY_PID=$!
+    echo "Celery started with PID $CELERY_PID."
     sleep 5
 }
 
-stop_zookeeper() {
-    echo "Stopping Zookeeper..."
-    /home/yzhang10/kafka/bin/zookeeper-server-stop.sh
+create_kafka_topic() {
+    echo "Creating Kafka topic 'predictions'..."
+    /home/yzhang10/kafka/bin/kafka-topics.sh --create --topic predictions --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1 > /dev/null 2>&1
+    echo "Kafka topic 'predictions' created."
 }
 
-stop_kafka() {
-    echo "Stopping Kafka..."
-    /home/yzhang10/kafka/bin/kafka-server-stop.sh
+# Define function to stop servers
+stop_process() {
+    local PID=$1
+    local NAME=$2
+    if ps -p $PID > /dev/null; then
+        echo "Stopping $NAME with PID $PID..."
+        kill -SIGTERM $PID
+        wait $PID
+        echo "$NAME stopped."
+    else
+        echo "$NAME is not running."
+    fi
 }
 
-stop_redis() {
-    echo "Stopping Redis..."
-    pkill -f $REDIS_SERVER
-}
-
-stop_celery() {
-    echo "Stopping Celery worker..."
-    pkill -f "celery"
-}
-
-start_all() {
+# Parse input arguments
+if [ "$1" == "start" ]; then
     echo "Starting all servers..."
     start_zookeeper
     start_kafka
-    start_redis
+    create_kafka_topic
     start_celery
     echo "All servers started."
-}
 
-stop_all() {
+elif [ "$1" == "stop" ]; then
     echo "Stopping all servers..."
-    stop_celery
-    stop_kafka
-    stop_redis
-    stop_zookeeper
+    stop_process $ZOOKEEPER_PID "Zookeeper"
+    stop_process $KAFKA_PID "Kafka"
+    stop_process $CELERY_PID "Celery"
     echo "All servers stopped."
-}
 
-# Display usage
-usage() {
-    echo "Usage: $0 {start|stop|restart}"
+else
+    echo "Usage: $0 {start|stop}"
     exit 1
-}
-
-# Main script
-case "$1" in
-    start)
-        start_all
-        ;;
-    stop)
-        stop_all
-        ;;
-    restart)
-        stop_all
-        start_all
-        ;;
-    *)
-        usage
-        ;;
-esac
+fi
