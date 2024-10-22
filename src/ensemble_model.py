@@ -47,7 +47,6 @@ class EnsembleModel:
         malicious = X[y == 1]
         benign = X[y == 0]
 
-        # Perform up-sampling or down-sampling
         if len(malicious) > len(benign):
             malicious_downsampled = resample(malicious, replace=False, n_samples=len(benign), random_state=42)
             X_balanced = np.concatenate([malicious_downsampled, benign])
@@ -61,34 +60,28 @@ class EnsembleModel:
 
     def fit(self, X_batch, y_batch):
         """Train the model on a batch of data with stratified sampling."""
-        # Log the type of input data
         logging.info(f"Received X_batch of type {type(X_batch)}")
 
-        # Ensure X_batch is a list of strings
         if isinstance(X_batch, np.ndarray):
             X_batch = X_batch.tolist()
             logging.info(f"Converted X_batch from np.ndarray to list.")
 
-        # Check if X_batch is a list of strings
         if not all(isinstance(x, str) for x in X_batch):
             raise ValueError("X_batch must be a list of strings for TfidfVectorizer")
 
-        # Perform stratified sampling to balance the dataset
         X_balanced, y_balanced = self.stratified_sampling(np.array(X_batch), np.array(y_batch))
         logging.info(f"Balanced batch size: {len(X_balanced)} malicious and {len(y_balanced)} benign samples.")
 
-        # Transform the input data
         X_transformed = self.vectorizer.fit_transform(X_balanced)
         logging.info(f"Transformed X_batch into feature matrix of shape {X_transformed.shape}")
 
-        # Fit the model
         self.stacking_classifier.fit(X_transformed, y_balanced)
-  
+
     def extract_features(self, X_batch):
-      """Extract features using the vectorizer. Ensure X_batch is iterable."""
-      if isinstance(X_batch, str):
-          X_batch = [X_batch]  # Ensure X_batch is a list of URLs, not a single URL
-      return self.vectorizer.transform(X_batch).toarray()
+        """Extract features using the vectorizer. Ensure X_batch is iterable."""
+        if isinstance(X_batch, str):
+            X_batch = [X_batch]
+        return self.vectorizer.transform(X_batch).toarray()
 
     def classify(self, features):
         """Classify the features into labels."""
@@ -117,15 +110,13 @@ class EnsembleModel:
         precision = precision_score(y_true, y_pred, average='binary')
         recall = recall_score(y_true, y_pred, average='binary')
         f1 = f1_score(y_true, y_pred, average='binary')
-        roc_auc = roc_auc_score(y_true, y_pred_proba[:, 1])  # Use probability of positive class
+        roc_auc = roc_auc_score(y_true, y_pred_proba[:, 1])
         conf_matrix = confusion_matrix(y_true, y_pred)
 
-        # Extract TP, TN, FP, FN from confusion matrix
         tn, fp, fn, tp = conf_matrix.ravel()
 
-        # Calculate True Positive Rate (TPR) and False Positive Rate (FPR)
-        tpr = tp / (tp + fn)  # True Positive Rate: Sensitivity/Recall
-        fpr = fp / (fp + tn)  # False Positive Rate
+        tpr = tp / (tp + fn)
+        fpr = fp / (fp + tn)
 
         return {
             'accuracy': accuracy,
@@ -147,11 +138,9 @@ class EnsembleModel:
         y_true = test_data['label']
         url_list = test_data['url'].tolist()
 
-        # Parallel processing of URLs
         features_list, y_pred = self.process_urls_in_parallel(url_list)
         y_pred_proba = [self.classify_proba(features) for features in features_list]
 
-        # Calculate metrics
         metrics = self.calculate_metrics(y_true, y_pred, y_pred_proba)
         return metrics
 
@@ -160,16 +149,16 @@ class EnsembleModel:
         self.fit(X_batch, y_batch)
 
     def save_model(self, path="models/ensemble_model.pkl"):
-        """Save the trained model to disk."""
-        # Ensure the directory exists
+        """Save the trained model and vectorizer to disk."""
         directory = os.path.dirname(path)
         if not os.path.exists(directory):
             os.makedirs(directory)
         
-        # Save the model
-        joblib.dump(self.stacking_classifier, path)
-        logging.info(f"Model saved to {path}")
+        joblib.dump({'model': self.stacking_classifier, 'vectorizer': self.vectorizer}, path)
+        logging.info(f"Model and vectorizer saved to {path}")
 
     def load_model(self, path="models/ensemble_model.pkl"):
-        """Load a saved model from disk."""
-        self.stacking_classifier = joblib.load(path)
+        """Load the saved model and vectorizer from disk."""
+        loaded_data = joblib.load(path)
+        self.stacking_classifier = loaded_data['model']
+        self.vectorizer = loaded_data['vectorizer']
