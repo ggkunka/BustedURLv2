@@ -1,6 +1,8 @@
 import torch
 import numpy as np
 import logging
+import os
+import joblib
 from transformers import BertModel, RobertaModel, DistilBertModel, XLNetModel
 from sklearn.ensemble import StackingClassifier
 from sklearn.linear_model import LogisticRegression
@@ -142,8 +144,15 @@ class EnsembleModel:
 
     def save_model(self, path="models/ensemble_model.pkl"):
         """Save the trained model to disk."""
-        import joblib
+        # Ensure the directory exists
+        directory = os.path.dirname(path)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        
+        # Save the model
         joblib.dump(self.stacking_classifier, path)
+        logging.info(f"Model saved to {path}")
+
 
     def load_model(self, path="models/ensemble_model.pkl"):
         """Load a saved model from disk."""
