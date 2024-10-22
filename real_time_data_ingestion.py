@@ -12,7 +12,7 @@ import os
 # Configure logging to write to a file
 logging.basicConfig(
     filename='real_time_data_ingestion.log',  # Log file name
-    level=logging.INFO,  # Log level
+    level=logging.DEBUG,  # Set log level to DEBUG to capture detailed information
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
@@ -36,16 +36,16 @@ class RealTimeDataIngestion:
     def is_new_url(self, url):
         """Check if the URL has been processed before."""
         if not self.redis_client.exists(url):
-            self.logger.info(f"New URL detected: {url}")
+            self.logger.debug(f"New URL detected: {url}")  # Use DEBUG for individual URL logs
             return True
         else:
-            self.logger.info(f"URL already processed: {url}")
+            self.logger.debug(f"URL already processed: {url}")
             return False
 
     def mark_url_processed(self, url):
         """Mark a URL as processed by adding it to Redis."""
         self.redis_client.set(url, 1)  # Store the URL with an arbitrary value of 1
-        self.logger.info(f"URL marked as processed in Redis: {url}")
+        self.logger.debug(f"URL marked as processed in Redis: {url}")
 
     def append_to_hdfs(self):
         """Append collected URLs to HDFS using HDFS CLI."""
@@ -53,8 +53,8 @@ class RealTimeDataIngestion:
         local_file = "/tmp/collected_urls.txt"  # Temporary file to write URLs before appending
 
         try:
-            # Log the URLs being appended
-            self.logger.info(f"URLs to append: {self.urls_to_store}")
+            # Log the number of URLs being appended
+            self.logger.info(f"URLs to append: {len(self.urls_to_store)}")  # Only log the number of URLs
 
             if not self.urls_to_store:
                 self.logger.info("No new URLs to append.")
@@ -95,7 +95,7 @@ class RealTimeDataIngestion:
 
             for url in urls:
                 if self.is_new_url(url):
-                    self.logger.info(f"Collected new URL from OpenPhish: {url}")
+                    self.logger.debug(f"Collected new URL from OpenPhish: {url}")  # Debugging detailed logs
                     send_message('real_time_urls', {'url': url, 'status': 1})  # Mark as malicious (1)
                     self.urls_to_store.append({'url': url, 'status': 1})
                     self.mark_url_processed(url)
@@ -115,7 +115,7 @@ class RealTimeDataIngestion:
                 if self.is_new_url(url) and url:  # Ensure URL is valid and non-empty
                     if not url.startswith("http://") and not url.startswith("https://"):
                         url = "http://" + url  # Add the prefix if missing
-                    self.logger.info(f"Collected new URL from Cybercrime Tracker: {url}")
+                    self.logger.debug(f"Collected new URL from Cybercrime Tracker: {url}")
                     send_message('real_time_urls', {'url': url, 'status': 1})  # Mark as malicious (1)
                     self.urls_to_store.append({'url': url, 'status': 1})
                     self.mark_url_processed(url)
@@ -138,7 +138,7 @@ class RealTimeDataIngestion:
                         url = fields[2].replace('"', '')  # Extract URL field and remove quotes
                         status = 1 if fields[3] == 'online' else 0  # Mark as 1 for malicious, 0 for benign
                         if self.is_new_url(url):
-                            self.logger.info(f"Collected new URL from URLHaus: {url}")
+                            self.logger.debug(f"Collected new URL from URLHaus: {url}")
                             send_message('real_time_urls', {'url': url, 'status': status})
                             self.urls_to_store.append({'url': url, 'status': status})
                             self.mark_url_processed(url)
@@ -160,7 +160,7 @@ class RealTimeDataIngestion:
 
             for url in urls:
                 if self.is_new_url(url):
-                    self.logger.info(f"Collected new URL from AbuseIPDB: {url}")
+                    self.logger.debug(f"Collected new URL from AbuseIPDB: {url}")
                     send_message('real_time_urls', {'url': url, 'status': 1})  # Mark as malicious (1)
                     self.urls_to_store.append({'url': url, 'status': 1})
                     self.mark_url_processed(url)
