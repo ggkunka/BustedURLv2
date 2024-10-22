@@ -56,10 +56,11 @@ def batch_process_data(model, X_raw, y, batch_size=100):
 
         logger.info(f"Processing batch {i + 1}/{num_batches}...")
 
-        # Ensure batch is passed as a list for feature extraction
-        X_batch = model.extract_features(X_batch_raw)
+        # Convert X_batch_raw to a list of strings if it is not already
+        X_batch_raw = X_batch_raw.tolist() if isinstance(X_batch_raw, np.ndarray) else X_batch_raw
 
-        # Train the model with the current batch
+        # Extract features and train the model with the current batch
+        X_batch = model.extract_features(X_batch_raw)
         model.train_on_batch(X_batch, y_batch)
 
 
