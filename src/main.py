@@ -3,7 +3,7 @@ import pandas as pd
 from src.ensemble_model import EnsembleModel
 from src.cmas_agents import DataCollectionAgent
 from ids_ips.integration import IDS_IPS_Integration
-from kafka_broker import KafkaBroker
+from kafka_broker import KafkaProducer  # Updated to KafkaProducer
 from src.utils.logger import get_logger
 from real_time_data_ingestion import start_real_time_ingestion
 from hdfs import InsecureClient  # HDFS client for Python
@@ -67,8 +67,8 @@ def main():
         result = ids_ips.process_incoming_url(url)
         logger.info(f"URL {url} processed with result: {result}")
     
-    # Start Kafka Broker (optional, if using Kafka)
-    kafka = KafkaBroker()
+    # Start Kafka Producer (replace KafkaBroker with KafkaProducer)
+    kafka_producer = KafkaProducer()
     
     # Example: Simulate URL processing (replace with real-time message consumption)
     test_urls = ["http://malicious-example.com", "http://benign-example.com"]
