@@ -7,8 +7,16 @@ logger = get_logger("IDS_IPS")
 
 class IDS_IPS_Integration:
     def __init__(self):
+        # Load the signature database if available
         self.signature_db = self.load_signature_db()
+        
+        # Initialize the ensemble model and load the trained model from disk
         self.ensemble_model = EnsembleModel()
+        try:
+            self.ensemble_model.load_model('models/ensemble_model.pkl')
+            logging.info("Successfully loaded the ensemble model for IDS/IPS integration.")
+        except FileNotFoundError:
+            logging.error("Trained model not found. Please ensure the model is trained and saved before use.")
 
     def load_signature_db(self):
         """Load the signature database from CSV."""
