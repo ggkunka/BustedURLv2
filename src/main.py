@@ -5,8 +5,7 @@ from src.cmas_agents import DataCollectionAgent
 from ids_ips.integration import IDS_IPS_Integration
 from kafka_broker import KafkaProducer  # Updated to KafkaProducer
 from src.utils.logger import get_logger
-from real_time_data_ingestion import RealTimeDataIngestion  # Import the class
-from hdfs import InsecureClient  # HDFS client for Python
+import subprocess  # Added to use system's HDFS CLI
 import sys
 
 # Add the BustedURLv2 folder to sys.path
@@ -16,25 +15,26 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 logger = get_logger("MainLogger")
 
 # HDFS setup
-HDFS_URL = "http://localhost:9000"
 HDFS_PATH = "/phishing_urls/collected_urls.txt"
 LOCAL_FILE_PATH = "/tmp/collected_urls.txt"  # Temporary local file path
 
 def fetch_data_from_hdfs():
-    """Fetch the latest data from HDFS and store it locally for model training."""
-    logger.info("Fetching data from HDFS...")
-    
+    """Fetch the latest data from HDFS and store it locally for model training using HDFS CLI."""
+    logger.info("Fetching data from HDFS using HDFS CLI...")
+
     try:
-        hdfs_client = InsecureClient(HDFS_URL, user='hadoop_user')
-        hdfs_client.download(HDFS_PATH, LOCAL_FILE_PATH, overwrite=True)
+        # Use HDFS CLI to copy the file from HDFS to the local file system
+        cmd = f"hdfs dfs -get {HDFS_PATH} {LOCAL_FILE_PATH}"
+        subprocess.run(cmd, shell=True, check=True)
+        
         logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
         
         # Load and preprocess data
         data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'])
         return data
     
-    except Exception as e:
-        logger.error(f"Failed to fetch data from HDFS: {e}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to fetch data from HDFS using CLI: {str(e)}")
         return None
 
 def main():
@@ -43,7 +43,7 @@ def main():
     # Initialize the ensemble model
     model = EnsembleModel()
 
-    # Start real-time data ingestion
+    # Skip real-time data ingestion for this test
     # real_time_data_agent = RealTimeDataIngestion()  # Use the class
     # real_time_data_agent.start_real_time_collection()  # Use the correct method name
 
