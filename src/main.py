@@ -44,25 +44,24 @@ def fetch_data_from_hdfs():
         logger.error(f"Failed to fetch data from HDFS using CLI: {str(e)}")
         return None
 
-def batch_process_data(model, X_raw, y):
-    """Process data in batches and train the model incrementally."""
-    num_batches = len(X_raw) // BATCH_SIZE + (1 if len(X_raw) % BATCH_SIZE != 0 else 0)
+def batch_process_data(model, X_raw, y, batch_size=100):
+    """Process the data in batches and train the model."""
+    num_batches = len(X_raw) // batch_size + 1
 
     for i in range(num_batches):
-        logger.info(f"Processing batch {i+1}/{num_batches}...")
-        start_idx = i * BATCH_SIZE
-        end_idx = start_idx + BATCH_SIZE
-
+        start_idx = i * batch_size
+        end_idx = min((i + 1) * batch_size, len(X_raw))
         X_batch_raw = X_raw[start_idx:end_idx]
         y_batch = y[start_idx:end_idx]
 
-        # Extract features for the batch
-        X_batch = [model.extract_features(url) for url in X_batch_raw]
+        logger.info(f"Processing batch {i + 1}/{num_batches}...")
 
-        # Train the model on this batch
+        # Ensure batch is passed as a list for feature extraction
+        X_batch = model.extract_features(X_batch_raw)
+
+        # Train the model with the current batch
         model.train_on_batch(X_batch, y_batch)
-    
-    logger.info("All batches processed and model training completed.")
+
 
 def main():
     logger.info("Starting BustedURL system...")
