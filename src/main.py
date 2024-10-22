@@ -48,12 +48,18 @@ def fetch_data_from_hdfs():
         return None
 
 def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
-    """Process data in batches using stratified sampling."""
+    """Process data in batches using stratified sampling and evaluate metrics."""
+    from sklearn.model_selection import train_test_split
+
     # Ensure we have a balanced batch for training using stratified sampling
     X_train, _, y_train, _ = train_test_split(X_raw, y, test_size=0.3, stratify=y)
     
     num_batches = len(X_train) // batch_size + (1 if len(X_train) % batch_size != 0 else 0)
     skipped_batches = []
+
+    # Initialize lists to store true labels and predictions for metrics calculation
+    all_y_true = []
+    all_y_pred = []
 
     for batch_num in range(num_batches):
         start_idx = batch_num * batch_size
@@ -74,9 +80,30 @@ def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
         # Train the model on this batch
         try:
             model.train_on_batch(X_batch, y_batch)
+
+            # Extract features and get predictions after training for metrics calculation
+            features = model.extract_features(X_batch)
+            y_pred = model.classify(features)
+            all_y_true.extend(y_batch)
+            all_y_pred.extend(y_pred)
+
         except ValueError as e:
             logging.error(f"Failed to train on batch {batch_num + 1}: {e}")
             continue
+
+    # Calculate metrics after processing all batches
+    if all_y_true and all_y_pred:
+        # Convert lists to numpy arrays for metric calculation
+        all_y_true = np.array(all_y_true)
+        all_y_pred = np.array(all_y_pred)
+
+        # Use model's calculate_metrics method to compute and log metrics
+        metrics = model.calculate_metrics(all_y_true, all_y_pred, all_y_pred)  # Pass y_pred as a placeholder for probabilities
+        logging.info(f"Final training metrics: {metrics}")
+    else:
+        logging.warning("No valid batches were processed for metric calculation.")
+
+
 
 def main():
     logger.info("Starting BustedURL system...")
