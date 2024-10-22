@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from src.ensemble_model import EnsembleModel
 from src.cmas_agents import DataCollectionAgent
-from ids_ips.integration import IDSIPS
+from ids_ips.integration import IDS_IPS_Integration
 from kafka_broker import KafkaBroker
 from src.utils.logger import get_logger
 from real_time_data_ingestion import start_real_time_ingestion
@@ -11,15 +11,6 @@ import sys
 
 # Add the BustedURLv2 folder to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from ids_ips.integration import IDSIPS
-from src.ensemble_model import EnsembleModel
-from src.cmas_agents import DataCollectionAgent
-from kafka_broker import KafkaBroker
-from src.utils.logger import get_logger
-from real_time_data_ingestion import start_real_time_ingestion
-
-
 
 # Initialize logger
 logger = get_logger("MainLogger")
@@ -39,8 +30,7 @@ def fetch_data_from_hdfs():
         logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
         
         # Load and preprocess data
-        data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url'])
-        data['label'] = data['url'].apply(lambda url: 1 if 'malicious' in url else 0)  # Example logic
+        data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'])
         return data
     
     except Exception as e:
@@ -69,12 +59,22 @@ def main():
         model.save_model('models/ensemble_model.pkl')
         logger.info("Model training completed and saved.")
     
-    # Start IDS/IPS system
-    ids_ips = IDSIPS(threshold=0.85)
+    # Initialize IDS/IPS system for real-time URL classification
+    ids_ips = IDS_IPS_Integration()
     
-    # Kafka Broker
+    def process_url(url):
+        """Process URL using IDS/IPS and Ensemble Model."""
+        result = ids_ips.process_incoming_url(url)
+        logger.info(f"URL {url} processed with result: {result}")
+    
+    # Start Kafka Broker (optional, if using Kafka)
     kafka = KafkaBroker()
     
+    # Example: Simulate URL processing (replace with real-time message consumption)
+    test_urls = ["http://malicious-example.com", "http://benign-example.com"]
+    for url in test_urls:
+        process_url(url)
+
     logger.info("System is now running in real-time mode.")
 
 if __name__ == "__main__":
