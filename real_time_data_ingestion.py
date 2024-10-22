@@ -12,7 +12,7 @@ import os
 # Configure logging to write to a file
 logging.basicConfig(
     filename='real_time_data_ingestion.log',  # Log file name
-    level=logging.DEBUG,  # Set log level to DEBUG to capture detailed information
+    level=logging.INFO,  # Set the log level to INFO
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
