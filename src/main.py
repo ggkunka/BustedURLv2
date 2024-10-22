@@ -1,11 +1,11 @@
 import os
 import pandas as pd
 from src.ensemble_model import EnsembleModel
-from src.cmas_agents import DataCollectionAgent
 from ids_ips.integration import IDS_IPS_Integration
 from kafka_broker import KafkaProducer  # Updated to KafkaProducer
 from src.utils.logger import get_logger
-import subprocess  # Added to use system's HDFS CLI
+from hdfs import InsecureClient  # HDFS client for Python
+import subprocess
 import sys
 
 # Add the BustedURLv2 folder to sys.path
@@ -19,16 +19,8 @@ HDFS_URL = "http://localhost:9000"
 HDFS_PATH = "/phishing_urls/collected_urls.txt"
 LOCAL_FILE_PATH = "/tmp/collected_urls.txt"  # Temporary local file path
 
-def clean_url_field(row):
-    """Fix URL if it contains extra commas."""
-    if len(row) > 2:  # If there are more than 2 fields, merge extra fields into the URL
-        row[0] = ",".join(row[:-1])  # Combine everything except the last field as URL
-        row[1] = row[-1]  # The last field becomes the label
-        return row[:2]  # Only return the first two fields
-    return row
-
 def fetch_data_from_hdfs():
-    """Fetch the latest data from HDFS and store it locally for model training using HDFS CLI."""
+    """Fetch the latest data from HDFS and store it locally for model training."""
     logger.info("Fetching data from HDFS using HDFS CLI...")
 
     try:
@@ -43,7 +35,7 @@ def fetch_data_from_hdfs():
 
         logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
 
-        # Load and preprocess data with on_bad_lines to skip problematic lines
+        # Load and preprocess data
         data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'], on_bad_lines='skip')
         logger.info(f"Data loaded successfully with {len(data)} rows.")
         return data
@@ -58,17 +50,16 @@ def main():
     # Initialize the ensemble model
     model = EnsembleModel()
 
-    # Skip real-time data ingestion for this test
-    # real_time_data_agent = RealTimeDataIngestion()  # Use the class
-    # real_time_data_agent.start_real_time_collection()  # Use the correct method name
-
     # Fetch the real-time dataset from HDFS
     dataset = fetch_data_from_hdfs()
 
     # If data is fetched successfully, proceed with model training
     if dataset is not None:
-        X, y = dataset['url'].values, dataset['label'].values
-        
+        X_raw, y = dataset['url'].values, dataset['label'].values
+
+        # Extract features from the raw URLs
+        X = [model.extract_features(url) for url in X_raw]
+
         # Train the model incrementally with the new data
         model.train_on_batch(X, y)
         model.save_model('models/ensemble_model.pkl')
