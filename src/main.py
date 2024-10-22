@@ -5,7 +5,7 @@ from src.cmas_agents import DataCollectionAgent
 from ids_ips.integration import IDS_IPS_Integration
 from kafka_broker import KafkaProducer  # Updated to KafkaProducer
 from src.utils.logger import get_logger
-from real_time_data_ingestion import start_real_time_ingestion
+from real_time_data_ingestion import RealTimeDataIngestion  # Import the class
 from hdfs import InsecureClient  # HDFS client for Python
 import sys
 
@@ -44,8 +44,8 @@ def main():
     model = EnsembleModel()
 
     # Start real-time data ingestion
-    real_time_data_agent = DataCollectionAgent()
-    start_real_time_ingestion(real_time_data_agent)
+    real_time_data_agent = RealTimeDataIngestion()  # Use the class
+    real_time_data_agent.start_real_time_collection()  # Use the correct method name
 
     # Fetch the real-time dataset from HDFS
     dataset = fetch_data_from_hdfs()
