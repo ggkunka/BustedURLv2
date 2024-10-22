@@ -104,20 +104,29 @@ class EnsembleModel:
         features_list, predictions = zip(*results)
         return features_list, predictions
 
-    def calculate_metrics(self, y_true, y_pred, y_pred_proba):
+    def calculate_metrics(self, y_true, y_pred, y_pred_proba=None):
         """Calculate various evaluation metrics."""
+        
         accuracy = accuracy_score(y_true, y_pred)
         precision = precision_score(y_true, y_pred, average='binary')
         recall = recall_score(y_true, y_pred, average='binary')
         f1 = f1_score(y_true, y_pred, average='binary')
-        roc_auc = roc_auc_score(y_true, y_pred_proba[:, 1])
+        
+        if y_pred_proba is not None and len(y_pred_proba.shape) > 1:  # Ensure we have 2D probabilities
+            roc_auc = roc_auc_score(y_true, y_pred_proba[:, 1])  # Use probability of positive class
+        else:
+            logging.warning("Predicted probabilities not available, skipping ROC AUC calculation.")
+            roc_auc = None
+        
         conf_matrix = confusion_matrix(y_true, y_pred)
-
+    
+        # Extract TP, TN, FP, FN from confusion matrix
         tn, fp, fn, tp = conf_matrix.ravel()
-
-        tpr = tp / (tp + fn)
-        fpr = fp / (fp + tn)
-
+    
+        # Calculate True Positive Rate (TPR) and False Positive Rate (FPR)
+        tpr = tp / (tp + fn)  # True Positive Rate: Sensitivity/Recall
+        fpr = fp / (fp + tn)  # False Positive Rate
+    
         return {
             'accuracy': accuracy,
             'precision': precision,
