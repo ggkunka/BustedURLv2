@@ -31,15 +31,19 @@ def fetch_data_from_hdfs():
     logger.info("Fetching data from HDFS using HDFS CLI...")
 
     try:
+        # Check if the local file exists, and remove it if it does
+        if os.path.exists(LOCAL_FILE_PATH):
+            logger.info(f"Removing existing local file: {LOCAL_FILE_PATH}")
+            os.remove(LOCAL_FILE_PATH)
+
         # Use HDFS CLI to copy the file from HDFS to the local file system
         cmd = f"/home/yzhang10/hadoop/bin/hdfs dfs -get {HDFS_PATH} {LOCAL_FILE_PATH}"
         subprocess.run(cmd, shell=True, check=True)
-        
+
         logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
 
-        # Load and preprocess data with cleanup
+        # Load and preprocess data
         data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'], error_bad_lines=False)
-        data = data.apply(lambda row: clean_url_field(row), axis=1)
         logger.info(f"Data loaded successfully with {len(data)} rows.")
         return data
 
