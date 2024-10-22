@@ -57,9 +57,10 @@ def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
     num_batches = len(X_train) // batch_size + (1 if len(X_train) % batch_size != 0 else 0)
     skipped_batches = []
 
-    # Initialize lists to store true labels and predictions for metrics calculation
+    # Initialize lists to store true labels, predictions, and prediction probabilities for metrics calculation
     all_y_true = []
     all_y_pred = []
+    all_y_pred_proba = []  # For storing predicted probabilities
 
     for batch_num in range(num_batches):
         start_idx = batch_num * batch_size
@@ -81,11 +82,13 @@ def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
         try:
             model.train_on_batch(X_batch, y_batch)
 
-            # Extract features and get predictions after training for metrics calculation
+            # Extract features and get predictions and probabilities after training for metrics calculation
             features = model.extract_features(X_batch)
             y_pred = model.classify(features)
+            y_pred_proba = model.classify_proba(features)  # Get predicted probabilities for ROC AUC
             all_y_true.extend(y_batch)
             all_y_pred.extend(y_pred)
+            all_y_pred_proba.extend(y_pred_proba)  # Store the probabilities
 
         except ValueError as e:
             logging.error(f"Failed to train on batch {batch_num + 1}: {e}")
@@ -96,14 +99,13 @@ def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
         # Convert lists to numpy arrays for metric calculation
         all_y_true = np.array(all_y_true)
         all_y_pred = np.array(all_y_pred)
+        all_y_pred_proba = np.array(all_y_pred_proba)
 
         # Use model's calculate_metrics method to compute and log metrics
-        metrics = model.calculate_metrics(all_y_true, all_y_pred, all_y_pred)  # Pass y_pred as a placeholder for probabilities
+        metrics = model.calculate_metrics(all_y_true, all_y_pred, all_y_pred_proba)  # Pass predicted probabilities for ROC AUC
         logging.info(f"Final training metrics: {metrics}")
     else:
         logging.warning("No valid batches were processed for metric calculation.")
-
-
 
 def main():
     logger.info("Starting BustedURL system...")
