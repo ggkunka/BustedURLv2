@@ -36,12 +36,10 @@ class EnsembleModel:
         # Added vectorizer for transforming URLs into features for the stacking classifier
         self.vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 3), max_features=1000)
 
-    def extract_features(self, url):
+    def extract_features(self, X_batch):
         """Extract features using transformer models and vectorizer."""
         # We will use the vectorizer to convert the URL into a vector of features
-        inputs = [url]  # Preprocess URL
-        features = self.vectorizer.transform(inputs).toarray()  # Convert URL into features using TF-IDF
-        return features
+        return self.vectorizer.fit_transform(X_batch).toarray()
 
     def classify(self, features):
         """Classify the features into labels."""
@@ -53,7 +51,7 @@ class EnsembleModel:
 
     def process_single_url(self, url):
         """Process a single URL: extract features and classify."""
-        features = self.extract_features(url)
+        features = self.extract_features([url])
         prediction = self.classify(features)
         return features, prediction
 
