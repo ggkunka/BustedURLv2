@@ -6,6 +6,7 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, roc_auc_score, confusion_matrix)
+from sklearn.feature_extraction.text import TfidfVectorizer  # Added for text feature extraction
 from multiprocessing import Pool
 from config.app_config import USE_XLNET  # Import the flag from configuration
 
@@ -32,12 +33,15 @@ class EnsembleModel:
             final_estimator=LogisticRegression()
         )
 
+        # Added vectorizer for transforming URLs into features for the stacking classifier
+        self.vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 3), max_features=1000)
+
     def extract_features(self, url):
-        """Extract features using transformer models."""
-        inputs = torch.tensor([url])  # Preprocess URL into tensor
-        embeddings = [model(inputs).last_hidden_state for model in self.transformer_models]
-        combined_embeddings = torch.cat(embeddings, dim=1)  # Concatenate embeddings from all models
-        return combined_embeddings
+        """Extract features using transformer models and vectorizer."""
+        # We will use the vectorizer to convert the URL into a vector of features
+        inputs = [url]  # Preprocess URL
+        features = self.vectorizer.transform(inputs).toarray()  # Convert URL into features using TF-IDF
+        return features
 
     def classify(self, features):
         """Classify the features into labels."""
@@ -104,9 +108,10 @@ class EnsembleModel:
         metrics = self.calculate_metrics(y_true, y_pred, y_pred_proba)
         return metrics
 
-    def train_on_batch(self, X, y):
+    def train_on_batch(self, X_batch, y_batch):
         """Train on a new batch of data."""
-        self.stacking_classifier.fit(X, y)
+        X_transformed = self.vectorizer.fit_transform(X_batch)
+        self.stacking_classifier.fit(X_transformed, y_batch)
 
     def save_model(self, path="models/ensemble_model.pkl"):
         """Save the trained model to disk."""
