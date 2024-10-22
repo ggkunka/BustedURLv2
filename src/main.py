@@ -24,7 +24,7 @@ def fetch_data_from_hdfs():
 
     try:
         # Use HDFS CLI to copy the file from HDFS to the local file system
-        cmd = f"hdfs dfs -get {HDFS_PATH} {LOCAL_FILE_PATH}"
+        cmd = f"/home/yzhang10/hadoop/bin/hdfs dfs -get {HDFS_PATH} {LOCAL_FILE_PATH}"
         subprocess.run(cmd, shell=True, check=True)
         
         logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
