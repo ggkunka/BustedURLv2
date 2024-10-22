@@ -20,7 +20,7 @@ logger = get_logger("MainLogger")
 # HDFS setup
 HDFS_URL = "http://localhost:9000"
 #HDFS_PATH = "/phishing_urls/collected_urls.txt"
-HDFS_PATH = "/phishing_urls/full_cleaned_data.csv"
+HDFS_PATH = "/phishing_urls/cleaned_data_full.csv"
 LOCAL_FILE_PATH = "/tmp/collected_urls.txt"
 
 # Define batch size
