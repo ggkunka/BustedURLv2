@@ -8,6 +8,7 @@ from hdfs import InsecureClient
 import subprocess
 import sys
 import numpy as np  # Add this line for numpy
+import logging
 
 # Add the BustedURLv2 folder to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
