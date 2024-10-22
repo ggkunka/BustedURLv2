@@ -44,8 +44,8 @@ def main():
     model = EnsembleModel()
 
     # Start real-time data ingestion
-    real_time_data_agent = RealTimeDataIngestion()  # Use the class
-    real_time_data_agent.start_real_time_collection()  # Use the correct method name
+    # real_time_data_agent = RealTimeDataIngestion()  # Use the class
+    # real_time_data_agent.start_real_time_collection()  # Use the correct method name
 
     # Fetch the real-time dataset from HDFS
     dataset = fetch_data_from_hdfs()
