@@ -37,10 +37,10 @@ class EnsembleModel:
         self.vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 3), max_features=1000)
 
     def extract_features(self, X_batch):
-    """Extract features using the vectorizer. Ensure X_batch is iterable."""
-    if isinstance(X_batch, str):
-        X_batch = [X_batch]  # Ensure X_batch is a list of URLs, not a single URL
-    return self.vectorizer.fit_transform(X_batch).toarray()
+      """Extract features using the vectorizer. Ensure X_batch is iterable."""
+      if isinstance(X_batch, str):
+          X_batch = [X_batch]  # Ensure X_batch is a list of URLs, not a single URL
+      return self.vectorizer.fit_transform(X_batch).toarray()
 
 
     def classify(self, features):
