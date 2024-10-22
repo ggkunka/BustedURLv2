@@ -120,8 +120,16 @@ def main():
         # Process and train the model in batches
         batch_process_data(model, X_raw, y)
 
+        # Save the trained model
         model.save_model('models/ensemble_model.pkl')
         logger.info("Model training completed and saved.")
+    
+        # Evaluate model on the full dataset
+        features = model.extract_features(X_raw)
+        y_pred = model.classify(features)
+        metrics = model.calculate_metrics(y, y_pred, model.classify_proba(features))
+        
+        logger.info(f"Final Training Metrics: {metrics}")
     
     # Initialize IDS/IPS system
     ids_ips = IDS_IPS_Integration()
