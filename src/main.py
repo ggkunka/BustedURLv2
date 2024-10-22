@@ -59,8 +59,14 @@ def batch_process_data(model, X_raw, y, batch_size=100):
         X_batch = [str(url) for url in X_batch_raw]
         logging.info(f"Processing batch {batch_num + 1}/{num_batches}...")
 
+        # Check if the batch contains at least two classes
+        if len(set(y_batch)) < 2:
+            logging.warning(f"Skipping batch {batch_num + 1} due to only one class present.")
+            continue  # Skip this batch if only one class is present
+
         # Train the model on this batch
         model.train_on_batch(X_batch, y_batch)
+
 
 def main():
     logger.info("Starting BustedURL system...")
