@@ -74,6 +74,7 @@ def batch_process_data(model, X_raw, y, batch_size=100):
             logging.error(f"Failed to train on batch {batch_num + 1}: {e}")
             continue  # Skip batch if any training error occurs
 
+
 def main():
     logger.info("Starting BustedURL system...")
 
@@ -94,21 +95,21 @@ def main():
     
     # Initialize IDS/IPS system
     ids_ips = IDS_IPS_Integration()
-    
-    def process_url(url):
-        """Process URL using IDS/IPS and Ensemble Model."""
-        result = ids_ips.process_incoming_url(url)
-        logger.info(f"URL {url} processed with result: {result}")
-    
+      
     # Start Kafka Producer (replace KafkaBroker with KafkaProducer)
     kafka_producer = KafkaProducer()
 
     # Example: Simulate URL processing
     test_urls = ["http://malicious-example.com", "http://benign-example.com"]
     for url in test_urls:
-        process_url(url)
+        process_url(url, ids_ips)
 
     logger.info("System is now running in real-time mode.")
+
+def process_url(url, ids_ips):
+    """Process URL using IDS/IPS and Ensemble Model."""
+    result = ids_ips.process_incoming_url(url)
+    logger.info(f"URL {url} processed with result: {result}")
 
 if __name__ == "__main__":
     main()
