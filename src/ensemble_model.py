@@ -37,6 +37,22 @@ class EnsembleModel:
         # Vectorizer for transforming URLs into features
         self.vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 3), max_features=1000)
 
+    def fit(self, X_batch, y_batch):
+        """Train the model on a batch of data."""
+        # Flatten the batch if it's a list of lists
+        if isinstance(X_batch[0], list):
+            X_batch = [' '.join(map(str, x)) for x in X_batch]
+
+        # Ensure X_batch is a list of strings
+        if isinstance(X_batch, np.ndarray):
+            X_batch = X_batch.tolist()
+
+        # Transform the input data
+        X_transformed = self.vectorizer.fit_transform(X_batch)
+        
+        # Fit the model
+        self.stacking_classifier.fit(X_transformed, y_batch)
+  
     def extract_features(self, X_batch):
       """Extract features using the vectorizer. Ensure X_batch is iterable."""
       if isinstance(X_batch, str):
@@ -108,16 +124,6 @@ class EnsembleModel:
         # Calculate metrics
         metrics = self.calculate_metrics(y_true, y_pred, y_pred_proba)
         return metrics
-
-    def fit(self, X_batch, y_batch):
-    # Convert numpy array to list of strings (URLs)
-      if isinstance(X_batch, np.ndarray):
-          X_batch = X_batch.tolist()
-
-      # Now apply vectorization on the string data
-      X_transformed = self.vectorizer.fit_transform(X_batch)
-      self.stacking_classifier.fit(X_transformed, y_batch)
-
 
     def train_on_batch(self, X_batch, y_batch):
         """Alias for fit method to ensure compatibility."""
