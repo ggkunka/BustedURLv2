@@ -15,6 +15,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 logger = get_logger("MainLogger")
 
 # HDFS setup
+HDFS_URL = "http://localhost:9000"
 HDFS_PATH = "/phishing_urls/collected_urls.txt"
 LOCAL_FILE_PATH = "/tmp/collected_urls.txt"  # Temporary local file path
 
@@ -42,8 +43,8 @@ def fetch_data_from_hdfs():
 
         logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
 
-        # Load and preprocess data
-        data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'], error_bad_lines=False)
+        # Load and preprocess data with on_bad_lines to skip problematic lines
+        data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'], on_bad_lines='skip')
         logger.info(f"Data loaded successfully with {len(data)} rows.")
         return data
 
