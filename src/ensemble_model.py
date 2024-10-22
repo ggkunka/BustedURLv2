@@ -113,9 +113,9 @@ class EnsembleModel:
       if isinstance(X_batch, np.ndarray):
           X_batch = X_batch.tolist()
 
-    # Now apply vectorization on the string data
-    X_transformed = self.vectorizer.fit_transform(X_batch)
-    self.stacking_classifier.fit(X_transformed, y_batch)
+      # Now apply vectorization on the string data
+      X_transformed = self.vectorizer.fit_transform(X_batch)
+      self.stacking_classifier.fit(X_transformed, y_batch)
 
 
     def train_on_batch(self, X_batch, y_batch):
