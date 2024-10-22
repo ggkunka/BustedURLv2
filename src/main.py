@@ -19,12 +19,14 @@ logger = get_logger("MainLogger")
 
 # HDFS setup
 HDFS_URL = "http://localhost:9000"
-HDFS_PATH = "/phishing_urls/collected_urls.txt"
+#HDFS_PATH = "/phishing_urls/collected_urls.txt"
+HDFS_PATH = "/phishing_urls/full_cleaned_data.csv"
 LOCAL_FILE_PATH = "/tmp/collected_urls.txt"
 
 # Define batch size
 BATCH_SIZE = 100  # Adjust based on system capabilities
 
+'''
 def fetch_data_from_hdfs():
     """Fetch the latest data from HDFS and store it locally for model training."""
     logger.info("Fetching data from HDFS using HDFS CLI...")
@@ -40,6 +42,29 @@ def fetch_data_from_hdfs():
         logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
 
         data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'], on_bad_lines='skip')
+        logger.info(f"Data loaded successfully with {len(data)} rows.")
+        return data
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to fetch data from HDFS using CLI: {str(e)}")
+        return None
+'''
+def fetch_data_from_hdfs():
+    """Fetch the latest data from HDFS and store it locally for model training."""
+    logger.info("Fetching data from HDFS using HDFS CLI...")
+
+    try:
+        if os.path.exists(LOCAL_FILE_PATH):
+            logger.info(f"Removing existing local file: {LOCAL_FILE_PATH}")
+            os.remove(LOCAL_FILE_PATH)
+
+        cmd = f"/home/yzhang10/hadoop/bin/hdfs dfs -get {HDFS_PATH} {LOCAL_FILE_PATH}"
+        subprocess.run(cmd, shell=True, check=True)
+
+        logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
+
+        # Explicitly set 'label' as int and skip the first row if it's a header
+        data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'], on_bad_lines='skip', dtype={'label': int})
         logger.info(f"Data loaded successfully with {len(data)} rows.")
         return data
 
