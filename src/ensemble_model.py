@@ -109,7 +109,6 @@ class EnsembleModel:
         return metrics
 
     def fit(self, X_batch, y_batch):
-    """Train the model on a batch of data."""
     # Convert numpy array to list of strings (URLs)
       if isinstance(X_batch, np.ndarray):
           X_batch = X_batch.tolist()
