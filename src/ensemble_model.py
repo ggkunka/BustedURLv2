@@ -110,6 +110,10 @@ class EnsembleModel:
         X_transformed = self.vectorizer.fit_transform(X_batch)
         self.stacking_classifier.fit(X_transformed, y_batch)
 
+    def train_on_batch(self, X_batch, y_batch):
+        """Alias for fit method to ensure compatibility."""
+        self.fit(X_batch, y_batch)
+
     def save_model(self, path="models/ensemble_model.pkl"):
         """Save the trained model to disk."""
         import joblib
