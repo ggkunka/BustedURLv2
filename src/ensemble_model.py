@@ -39,17 +39,27 @@ class EnsembleModel:
 
     def fit(self, X_batch, y_batch):
         """Train the model on a batch of data."""
+        # Log the type of input data
+        logging.info(f"Received X_batch of type {type(X_batch)}")
+
         # Flatten the batch if it's a list of lists
         if isinstance(X_batch[0], list):
             X_batch = [' '.join(map(str, x)) for x in X_batch]
+            logging.info(f"Flattened X_batch: {X_batch[:5]}")  # Log first few rows for debugging
 
         # Ensure X_batch is a list of strings
         if isinstance(X_batch, np.ndarray):
             X_batch = X_batch.tolist()
+            logging.info(f"Converted X_batch from np.ndarray to list.")
+
+        # Check if X_batch is a list of strings
+        if not all(isinstance(x, str) for x in X_batch):
+            raise ValueError("X_batch must be a list of strings for TfidfVectorizer")
 
         # Transform the input data
         X_transformed = self.vectorizer.fit_transform(X_batch)
-        
+        logging.info(f"Transformed X_batch into feature matrix of shape {X_transformed.shape}")
+
         # Fit the model
         self.stacking_classifier.fit(X_transformed, y_batch)
   
