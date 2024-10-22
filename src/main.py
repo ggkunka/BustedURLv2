@@ -49,6 +49,9 @@ def fetch_data_from_hdfs():
 def batch_process_data(model, X_raw, y, batch_size=100):
     """Process data in batches and train the model."""
     num_batches = len(X_raw) // batch_size + (1 if len(X_raw) % batch_size != 0 else 0)
+    skipped_batches = []
+    processed_batches = []
+    
     for batch_num in range(num_batches):
         start_idx = batch_num * batch_size
         end_idx = min(start_idx + batch_size, len(X_raw))
@@ -62,10 +65,22 @@ def batch_process_data(model, X_raw, y, batch_size=100):
         # Check if the batch contains at least two classes
         if len(set(y_batch)) < 2:
             logging.warning(f"Skipping batch {batch_num + 1} due to only one class present.")
+            skipped_batches.append((X_batch, y_batch))
             continue  # Skip this batch if only one class is present
 
         # Train the model on this batch
         model.train_on_batch(X_batch, y_batch)
+        processed_batches.append((X_batch, y_batch))
+
+    # Handle skipped batches by combining them with others if needed
+    if skipped_batches:
+        for X_skipped, y_skipped in skipped_batches:
+            for X_processed, y_processed in processed_batches:
+                combined_X = X_processed + X_skipped
+                combined_y = list(y_processed) + list(y_skipped)
+                if len(set(combined_y)) >= 2:
+                    model.train_on_batch(combined_X, combined_y)
+                    break  # Once processed, skip to the next skipped batch
 
 
 def main():
