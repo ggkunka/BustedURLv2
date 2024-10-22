@@ -7,6 +7,19 @@ from kafka_broker import KafkaBroker
 from src.utils.logger import get_logger
 from real_time_data_ingestion import start_real_time_ingestion
 from hdfs import InsecureClient  # HDFS client for Python
+import sys
+
+# Add the BustedURLv2 folder to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from ids_ips.integration import IDSIPS
+from src.ensemble_model import EnsembleModel
+from src.cmas_agents import DataCollectionAgent
+from kafka_broker import KafkaBroker
+from src.utils.logger import get_logger
+from real_time_data_ingestion import start_real_time_ingestion
+
+
 
 # Initialize logger
 logger = get_logger("MainLogger")
