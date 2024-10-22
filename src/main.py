@@ -60,7 +60,7 @@ def batch_process_data(model, X_raw, y):
         X_batch = [model.extract_features(url) for url in X_batch_raw]
 
         # Train the model on this batch
-        model.train_on_batch(X_batch, y_batch)
+        model.fit(X_batch, y_batch)
     
     logger.info("All batches processed and model training completed.")
 
