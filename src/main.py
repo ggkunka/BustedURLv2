@@ -46,24 +46,20 @@ def fetch_data_from_hdfs():
         return None
 
 def batch_process_data(model, X_raw, y, batch_size=100):
-    """Process the data in batches and train the model."""
-    num_batches = len(X_raw) // batch_size + 1
-
-    for i in range(num_batches):
-        start_idx = i * batch_size
-        end_idx = min((i + 1) * batch_size, len(X_raw))
+    """Process data in batches and train the model."""
+    num_batches = len(X_raw) // batch_size + (1 if len(X_raw) % batch_size != 0 else 0)
+    for batch_num in range(num_batches):
+        start_idx = batch_num * batch_size
+        end_idx = min(start_idx + batch_size, len(X_raw))
         X_batch_raw = X_raw[start_idx:end_idx]
         y_batch = y[start_idx:end_idx]
 
-        logger.info(f"Processing batch {i + 1}/{num_batches}...")
+        # Ensure X_batch_raw is a list of strings
+        X_batch = [str(url) for url in X_batch_raw]
+        logging.info(f"Processing batch {batch_num + 1}/{num_batches}...")
 
-        # Convert X_batch_raw to a list of strings if it is not already
-        X_batch_raw = X_batch_raw.tolist() if isinstance(X_batch_raw, np.ndarray) else X_batch_raw
-
-        # Extract features and train the model with the current batch
-        X_batch = model.extract_features(X_batch_raw)
+        # Train the model on this batch
         model.train_on_batch(X_batch, y_batch)
-
 
 def main():
     logger.info("Starting BustedURL system...")
