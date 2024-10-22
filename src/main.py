@@ -18,6 +18,14 @@ logger = get_logger("MainLogger")
 HDFS_PATH = "/phishing_urls/collected_urls.txt"
 LOCAL_FILE_PATH = "/tmp/collected_urls.txt"  # Temporary local file path
 
+def clean_url_field(row):
+    """Fix URL if it contains extra commas."""
+    if len(row) > 2:  # If there are more than 2 fields, merge extra fields into the URL
+        row[0] = ",".join(row[:-1])  # Combine everything except the last field as URL
+        row[1] = row[-1]  # The last field becomes the label
+        return row[:2]  # Only return the first two fields
+    return row
+
 def fetch_data_from_hdfs():
     """Fetch the latest data from HDFS and store it locally for model training using HDFS CLI."""
     logger.info("Fetching data from HDFS using HDFS CLI...")
@@ -28,11 +36,13 @@ def fetch_data_from_hdfs():
         subprocess.run(cmd, shell=True, check=True)
         
         logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
-        
-        # Load and preprocess data
-        data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'])
+
+        # Load and preprocess data with cleanup
+        data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'], error_bad_lines=False)
+        data = data.apply(lambda row: clean_url_field(row), axis=1)
+        logger.info(f"Data loaded successfully with {len(data)} rows.")
         return data
-    
+
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to fetch data from HDFS using CLI: {str(e)}")
         return None
