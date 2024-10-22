@@ -1,4 +1,5 @@
 import csv
+import logging
 from kafka_broker import send_message
 from src.ensemble_model import EnsembleModel
 from src.utils.logger import get_logger
