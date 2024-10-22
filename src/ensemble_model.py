@@ -11,8 +11,10 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, roc_auc_score, confusion_matrix)
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.utils import resample
 from multiprocessing import Pool
-from config.app_config import USE_XLNET  # Import the flag from configuration
+from config.app_config import USE_XLNET
 
 class EnsembleModel:
     def __init__(self):
@@ -40,15 +42,27 @@ class EnsembleModel:
         # Vectorizer for transforming URLs into features
         self.vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 3), max_features=1000)
 
+    def stratified_sampling(self, X, y):
+        """Perform stratified sampling to balance classes."""
+        malicious = X[y == 1]
+        benign = X[y == 0]
+
+        # Perform up-sampling or down-sampling
+        if len(malicious) > len(benign):
+            malicious_downsampled = resample(malicious, replace=False, n_samples=len(benign), random_state=42)
+            X_balanced = np.concatenate([malicious_downsampled, benign])
+            y_balanced = np.concatenate([np.ones(len(benign)), np.zeros(len(benign))])
+        else:
+            benign_downsampled = resample(benign, replace=False, n_samples=len(malicious), random_state=42)
+            X_balanced = np.concatenate([malicious, benign_downsampled])
+            y_balanced = np.concatenate([np.ones(len(malicious)), np.zeros(len(malicious))])
+
+        return X_balanced, y_balanced
+
     def fit(self, X_batch, y_batch):
-        """Train the model on a batch of data."""
+        """Train the model on a batch of data with stratified sampling."""
         # Log the type of input data
         logging.info(f"Received X_batch of type {type(X_batch)}")
-
-        # Flatten the batch if it's a list of lists
-        if isinstance(X_batch[0], list):
-            X_batch = [' '.join(map(str, x)) for x in X_batch]
-            logging.info(f"Flattened X_batch: {X_batch[:5]}")  # Log first few rows for debugging
 
         # Ensure X_batch is a list of strings
         if isinstance(X_batch, np.ndarray):
@@ -59,19 +73,22 @@ class EnsembleModel:
         if not all(isinstance(x, str) for x in X_batch):
             raise ValueError("X_batch must be a list of strings for TfidfVectorizer")
 
+        # Perform stratified sampling to balance the dataset
+        X_balanced, y_balanced = self.stratified_sampling(np.array(X_batch), np.array(y_batch))
+        logging.info(f"Balanced batch size: {len(X_balanced)} malicious and {len(y_balanced)} benign samples.")
+
         # Transform the input data
-        X_transformed = self.vectorizer.fit_transform(X_batch)
+        X_transformed = self.vectorizer.fit_transform(X_balanced)
         logging.info(f"Transformed X_batch into feature matrix of shape {X_transformed.shape}")
 
         # Fit the model
-        self.stacking_classifier.fit(X_transformed, y_batch)
+        self.stacking_classifier.fit(X_transformed, y_balanced)
   
     def extract_features(self, X_batch):
       """Extract features using the vectorizer. Ensure X_batch is iterable."""
       if isinstance(X_batch, str):
           X_batch = [X_batch]  # Ensure X_batch is a list of URLs, not a single URL
-      return self.vectorizer.fit_transform(X_batch).toarray()
-
+      return self.vectorizer.transform(X_batch).toarray()
 
     def classify(self, features):
         """Classify the features into labels."""
@@ -153,10 +170,6 @@ class EnsembleModel:
         joblib.dump(self.stacking_classifier, path)
         logging.info(f"Model saved to {path}")
 
-
     def load_model(self, path="models/ensemble_model.pkl"):
         """Load a saved model from disk."""
-        import joblib
         self.stacking_classifier = joblib.load(path)
-
-
