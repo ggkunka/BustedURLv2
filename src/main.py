@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from sklearn.model_selection import train_test_split
 from src.ensemble_model import EnsembleModel
 from ids_ips.integration import IDS_IPS_Integration
 from kafka_broker import KafkaProducer
@@ -7,7 +8,7 @@ from src.utils.logger import get_logger
 from hdfs import InsecureClient
 import subprocess
 import sys
-import numpy as np  # Add this line for numpy
+import numpy as np
 import logging
 
 # Add the BustedURLv2 folder to sys.path
@@ -22,7 +23,7 @@ HDFS_PATH = "/phishing_urls/collected_urls.txt"
 LOCAL_FILE_PATH = "/tmp/collected_urls.txt"
 
 # Define batch size
-BATCH_SIZE = 100  # You can adjust this depending on your system's capabilities
+BATCH_SIZE = 100  # Adjust based on system capabilities
 
 def fetch_data_from_hdfs():
     """Fetch the latest data from HDFS and store it locally for model training."""
@@ -46,16 +47,19 @@ def fetch_data_from_hdfs():
         logger.error(f"Failed to fetch data from HDFS using CLI: {str(e)}")
         return None
 
-def batch_process_data(model, X_raw, y, batch_size=100):
-    """Process data in batches and train the model."""
-    num_batches = len(X_raw) // batch_size + (1 if len(X_raw) % batch_size != 0 else 0)
+def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
+    """Process data in batches using stratified sampling."""
+    # Ensure we have a balanced batch for training using stratified sampling
+    X_train, _, y_train, _ = train_test_split(X_raw, y, test_size=0.3, stratify=y)
+    
+    num_batches = len(X_train) // batch_size + (1 if len(X_train) % batch_size != 0 else 0)
     skipped_batches = []
 
     for batch_num in range(num_batches):
         start_idx = batch_num * batch_size
-        end_idx = min(start_idx + batch_size, len(X_raw))
-        X_batch_raw = X_raw[start_idx:end_idx]
-        y_batch = y[start_idx:end_idx]
+        end_idx = min(start_idx + batch_size, len(X_train))
+        X_batch_raw = X_train[start_idx:end_idx]
+        y_batch = y_train[start_idx:end_idx]
 
         # Ensure X_batch_raw is a list of strings
         X_batch = [str(url) for url in X_batch_raw]
@@ -65,15 +69,14 @@ def batch_process_data(model, X_raw, y, batch_size=100):
         if len(set(y_batch)) < 2:
             logging.warning(f"Skipping batch {batch_num + 1} due to only one class present.")
             skipped_batches.append((X_batch, y_batch))
-            continue  # Skip this batch if only one class is present
+            continue
 
         # Train the model on this batch
         try:
             model.train_on_batch(X_batch, y_batch)
         except ValueError as e:
             logging.error(f"Failed to train on batch {batch_num + 1}: {e}")
-            continue  # Skip batch if any training error occurs
-
+            continue
 
 def main():
     logger.info("Starting BustedURL system...")
