@@ -123,3 +123,5 @@ class EnsembleModel:
         """Load a saved model from disk."""
         import joblib
         self.stacking_classifier = joblib.load(path)
+
+
