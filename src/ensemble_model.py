@@ -109,9 +109,15 @@ class EnsembleModel:
         return metrics
 
     def fit(self, X_batch, y_batch):
-        """Train the model on a batch of data."""
-        X_transformed = self.vectorizer.fit_transform(X_batch)
-        self.stacking_classifier.fit(X_transformed, y_batch)
+    """Train the model on a batch of data."""
+    # Convert numpy array to list of strings (URLs)
+      if isinstance(X_batch, np.ndarray):
+          X_batch = X_batch.tolist()
+
+    # Now apply vectorization on the string data
+    X_transformed = self.vectorizer.fit_transform(X_batch)
+    self.stacking_classifier.fit(X_transformed, y_batch)
+
 
     def train_on_batch(self, X_batch, y_batch):
         """Alias for fit method to ensure compatibility."""
