@@ -10,6 +10,7 @@ import subprocess
 import sys
 import numpy as np
 import logging
+import tracemalloc  # For memory profiling
 
 # Add the BustedURLv2 folder to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -20,7 +21,6 @@ logger = get_logger("MainLogger")
 # HDFS setup
 HDFS_URL = "http://localhost:9000"
 HDFS_PATH = "/phishing_urls/collected_urls.txt"
-#HDFS_PATH = "/phishing_urls/cleaned_data_full.csv"
 LOCAL_FILE_PATH = "/tmp/collected_urls.txt"
 
 # Define batch size
@@ -47,36 +47,15 @@ def fetch_data_from_hdfs():
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to fetch data from HDFS using CLI: {str(e)}")
         return None
-'''
-def fetch_data_from_hdfs():
-    """Fetch the latest data from HDFS and store it locally for model training."""
-    logger.info("Fetching data from HDFS using HDFS CLI...")
-
-    try:
-        if os.path.exists(LOCAL_FILE_PATH):
-            logger.info(f"Removing existing local file: {LOCAL_FILE_PATH}")
-            os.remove(LOCAL_FILE_PATH)
-
-        cmd = f"/home/yzhang10/hadoop/bin/hdfs dfs -get {HDFS_PATH} {LOCAL_FILE_PATH}"
-        subprocess.run(cmd, shell=True, check=True)
-
-        logger.info(f"Data successfully fetched from HDFS and saved to {LOCAL_FILE_PATH}")
-
-        # Explicitly set 'label' as int and skip the first row if it's a header
-        data = pd.read_csv(LOCAL_FILE_PATH, header=None, names=['url', 'label'], on_bad_lines='skip', dtype={'label': int})
-        logger.info(f"Data loaded successfully with {len(data)} rows.")
-        return data
-
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to fetch data from HDFS using CLI: {str(e)}")
-        return None
-'''
 
 def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
     """Process data in batches using stratified sampling and evaluate metrics."""
     from sklearn.model_selection import train_test_split
 
-    # Ensure we have a balanced batch for training using stratified sampling
+    # Memory profiling
+    tracemalloc.start()
+    start_snapshot = tracemalloc.take_snapshot()
+
     X_train, _, y_train, _ = train_test_split(X_raw, y, test_size=0.3, stratify=y)
     
     num_batches = len(X_train) // batch_size + (1 if len(X_train) % batch_size != 0 else 0)
@@ -129,6 +108,12 @@ def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
         # Use model's calculate_metrics method to compute and log metrics
         metrics = model.calculate_metrics(all_y_true, all_y_pred, all_y_pred_proba)  # Pass predicted probabilities for ROC AUC
         logging.info(f"Final training metrics: {metrics}")
+
+        # Memory profiling after training
+        end_snapshot = tracemalloc.take_snapshot()
+        memory_diff = end_snapshot.compare_to(start_snapshot, 'lineno')
+        for stat in memory_diff[:10]:
+            logging.info(f"Memory usage after batch processing: {stat}")
     else:
         logging.warning("No valid batches were processed for metric calculation.")
 
