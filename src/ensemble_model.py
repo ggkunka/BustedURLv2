@@ -14,6 +14,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.utils import resample
 from multiprocessing import Pool
+import tracemalloc  # For memory profiling
 from config.app_config import USE_XLNET
 
 class EnsembleModel:
@@ -59,8 +60,12 @@ class EnsembleModel:
         return X_balanced, y_balanced
 
     def fit(self, X_batch, y_batch):
-        """Train the model on a batch of data with stratified sampling."""
+        """Train the model on a batch of data with stratified sampling and track memory."""
         logging.info(f"Received X_batch of type {type(X_batch)}")
+
+        # Start memory profiling
+        tracemalloc.start()
+        start_snapshot = tracemalloc.take_snapshot()
 
         if isinstance(X_batch, np.ndarray):
             X_batch = X_batch.tolist()
@@ -76,6 +81,12 @@ class EnsembleModel:
         logging.info(f"Transformed X_batch into feature matrix of shape {X_transformed.shape}")
 
         self.stacking_classifier.fit(X_transformed, y_balanced)
+
+        # Memory profiling after training
+        end_snapshot = tracemalloc.take_snapshot()
+        memory_diff = end_snapshot.compare_to(start_snapshot, 'lineno')
+        for stat in memory_diff[:10]:
+            logging.info(f"Memory usage during training: {stat}")
 
     def extract_features(self, X_batch):
         """Extract features using the vectorizer. Ensure X_batch is iterable."""
@@ -98,10 +109,19 @@ class EnsembleModel:
         return features, prediction
 
     def process_urls_in_parallel(self, url_list):
-        """Process URLs in parallel using multiprocessing."""
+        """Process URLs in parallel using multiprocessing and track memory usage."""
+        tracemalloc.start()  # Start memory tracking before processing
+        start_snapshot = tracemalloc.take_snapshot()
+
         with Pool() as pool:
             results = pool.map(self.process_single_url, url_list)
         features_list, predictions = zip(*results)
+
+        end_snapshot = tracemalloc.take_snapshot()  # Capture memory snapshot after processing
+        memory_diff = end_snapshot.compare_to(start_snapshot, 'lineno')
+        for stat in memory_diff[:10]:
+            logging.info(f"Memory usage during parallel processing: {stat}")
+
         return features_list, predictions
 
     def calculate_metrics(self, y_true, y_pred, y_pred_proba=None):
