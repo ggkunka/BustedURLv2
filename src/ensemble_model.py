@@ -13,6 +13,7 @@ from scipy.sparse import csr_matrix  # For sparse matrix handling
 from multiprocessing import Pool
 import tracemalloc  # For memory profiling
 from config.app_config import USE_XLNET
+import gc  # For memory cleanup
 
 class EnsembleModel:
     def __init__(self):
@@ -94,6 +95,9 @@ class EnsembleModel:
         memory_diff = end_snapshot.compare_to(start_snapshot, 'lineno')
         for stat in memory_diff[:10]:
             logging.info(f"Memory usage during training: {stat}")
+
+        # Clean up memory
+        gc.collect()
 
     def extract_features(self, X_batch):
         """Extract features using the vectorizer and return a sparse matrix."""
