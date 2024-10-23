@@ -118,7 +118,7 @@ def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
     else:
         logging.warning("No valid batches were processed for metric calculation.")
 
-def incremental_training(model, dataset, chunk_size=10000):
+def incremental_training(model, dataset, chunk_size=CHUNK_SIZE):
     """Train the model incrementally in chunks."""
     num_rows = len(dataset)
     num_chunks = num_rows // chunk_size + (1 if num_rows % chunk_size != 0 else 0)
@@ -132,7 +132,10 @@ def incremental_training(model, dataset, chunk_size=10000):
         X_chunk, y_chunk = chunk['url'].values, chunk['label'].values
 
         # Call the train_on_batch method to process each chunk
-        model.train_on_batch(X_chunk, y_chunk)
+        model.fit(X_chunk, y_chunk)
+
+        # Explicit memory cleanup after each chunk
+        gc.collect()
 
 def main():
     logger.info("Starting BustedURL system...")
