@@ -28,7 +28,7 @@ class EnsembleModel:
 
         # Online learning classifiers
         self.online_classifiers = {
-            'sgd': SGDClassifier(loss='log', max_iter=1, warm_start=True),
+            'sgd': SGDClassifier(loss='log_loss', max_iter=1, warm_start=True),
             'pa': PassiveAggressiveClassifier(max_iter=1, warm_start=True)
         }
 
