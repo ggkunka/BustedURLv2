@@ -25,6 +25,7 @@ LOCAL_FILE_PATH = "/tmp/collected_urls.txt"
 
 # Define batch size
 BATCH_SIZE = 100  # Adjust based on system capabilities
+CHUNK_SIZE = 10000  # Define the chunk size for incremental training
 
 def fetch_data_from_hdfs():
     """Fetch the latest data from HDFS and store it locally for model training."""
@@ -117,6 +118,19 @@ def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
     else:
         logging.warning("No valid batches were processed for metric calculation.")
 
+def incremental_training(model, dataset):
+    """Incrementally train the model using chunks of data from the dataset."""
+    logger.info(f"Starting incremental training with chunk size {CHUNK_SIZE}...")
+
+    for chunk_start in range(0, len(dataset), CHUNK_SIZE):
+        chunk_end = min(chunk_start + CHUNK_SIZE, len(dataset))
+        data_chunk = dataset.iloc[chunk_start:chunk_end]
+
+        X_chunk, y_chunk = data_chunk['url'].values, data_chunk['label'].values
+
+        logger.info(f"Processing chunk {chunk_start // CHUNK_SIZE + 1} with {len(data_chunk)} rows.")
+        batch_process_data(model, X_chunk, y_chunk)
+
 def main():
     logger.info("Starting BustedURL system...")
 
@@ -127,19 +141,17 @@ def main():
     dataset = fetch_data_from_hdfs()
 
     if dataset is not None:
-        X_raw, y = dataset['url'].values, dataset['label'].values
-
-        # Process and train the model in batches
-        batch_process_data(model, X_raw, y)
+        # Process and train the model in chunks for incremental learning
+        incremental_training(model, dataset)
 
         # Save the trained model
         model.save_model('models/ensemble_model.pkl')
         logger.info("Model training completed and saved.")
     
         # Evaluate model on the full dataset
-        features = model.extract_features(X_raw)
+        features = model.extract_features(dataset['url'].values)
         y_pred = model.classify(features)
-        metrics = model.calculate_metrics(y, y_pred, model.classify_proba(features))
+        metrics = model.calculate_metrics(dataset['label'].values, y_pred, model.classify_proba(features))
         
         logger.info(f"Final Training Metrics: {metrics}")
     
