@@ -4,14 +4,10 @@ import logging
 import os
 import joblib
 from transformers import BertModel, RobertaModel, DistilBertModel, XLNetModel
-from sklearn.ensemble import StackingClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import SGDClassifier, PassiveAggressiveClassifier
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, roc_auc_score, confusion_matrix)
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.model_selection import train_test_split
 from sklearn.utils import resample
 from multiprocessing import Pool
 import tracemalloc  # For memory profiling
@@ -30,18 +26,17 @@ class EnsembleModel:
         if USE_XLNET:
             self.transformer_models.append(XLNetModel.from_pretrained('xlnet-base-cased'))
 
-        # Initialize the stacking classifier with multiple base models
-        self.stacking_classifier = StackingClassifier(
-            estimators=[
-                ('lr', LogisticRegression()),
-                ('svc', SVC(probability=True)),  # Enable probability for ROC AUC
-                ('dt', DecisionTreeClassifier())
-            ],
-            final_estimator=LogisticRegression()
-        )
+        # Online learning classifiers
+        self.online_classifiers = {
+            'sgd': SGDClassifier(loss='log', max_iter=1, warm_start=True),
+            'pa': PassiveAggressiveClassifier(max_iter=1, warm_start=True)
+        }
 
         # Vectorizer for transforming URLs into features
         self.vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 3), max_features=1000)
+
+        # Initialize a flag to track first fit
+        self.is_first_fit = True
 
     def stratified_sampling(self, X, y):
         """Perform stratified sampling to balance classes."""
@@ -77,10 +72,20 @@ class EnsembleModel:
         X_balanced, y_balanced = self.stratified_sampling(np.array(X_batch), np.array(y_batch))
         logging.info(f"Balanced batch size: {len(X_balanced)} malicious and {len(y_balanced)} benign samples.")
 
-        X_transformed = self.vectorizer.fit_transform(X_balanced)
+        X_transformed = self.vectorizer.fit_transform(X_balanced) if self.is_first_fit else self.vectorizer.transform(X_balanced)
         logging.info(f"Transformed X_batch into feature matrix of shape {X_transformed.shape}")
 
-        self.stacking_classifier.fit(X_transformed, y_balanced)
+        # Incremental training for online classifiers
+        for name, classifier in self.online_classifiers.items():
+            if self.is_first_fit:
+                classifier.partial_fit(X_transformed, y_balanced, classes=[0, 1])
+                logging.info(f"Initial training done with {name} classifier")
+            else:
+                classifier.partial_fit(X_transformed, y_balanced)
+                logging.info(f"Updated {name} classifier with incremental batch")
+
+        # After the first batch, set the flag to False
+        self.is_first_fit = False
 
         # Memory profiling after training
         end_snapshot = tracemalloc.take_snapshot()
@@ -95,12 +100,12 @@ class EnsembleModel:
         return self.vectorizer.transform(X_batch).toarray()
 
     def classify(self, features):
-        """Classify the features into labels."""
-        return self.stacking_classifier.predict(features)
+        """Classify the features into labels using the SGD classifier by default."""
+        return self.online_classifiers['sgd'].predict(features)
 
     def classify_proba(self, features):
-        """Return the probability estimates for the classes."""
-        return self.stacking_classifier.predict_proba(features)
+        """Return the probability estimates for the classes using the SGD classifier."""
+        return self.online_classifiers['sgd'].predict_proba(features)
 
     def process_single_url(self, url):
         """Process a single URL: extract features and classify."""
@@ -183,11 +188,11 @@ class EnsembleModel:
         if not os.path.exists(directory):
             os.makedirs(directory)
         
-        joblib.dump({'model': self.stacking_classifier, 'vectorizer': self.vectorizer}, path)
+        joblib.dump({'model': self.online_classifiers, 'vectorizer': self.vectorizer}, path)
         logging.info(f"Model and vectorizer saved to {path}")
 
     def load_model(self, path="models/ensemble_model.pkl"):
         """Load the saved model and vectorizer from disk."""
         loaded_data = joblib.load(path)
-        self.stacking_classifier = loaded_data['model']
+        self.online_classifiers = loaded_data['model']
         self.vectorizer = loaded_data['vectorizer']
