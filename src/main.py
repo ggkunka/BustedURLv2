@@ -19,14 +19,13 @@ logger = get_logger("MainLogger")
 
 # HDFS setup
 HDFS_URL = "http://localhost:9000"
-#HDFS_PATH = "/phishing_urls/collected_urls.txt"
-HDFS_PATH = "/phishing_urls/cleaned_data_full.csv"
+HDFS_PATH = "/phishing_urls/collected_urls.txt"
+#HDFS_PATH = "/phishing_urls/cleaned_data_full.csv"
 LOCAL_FILE_PATH = "/tmp/collected_urls.txt"
 
 # Define batch size
 BATCH_SIZE = 100  # Adjust based on system capabilities
 
-'''
 def fetch_data_from_hdfs():
     """Fetch the latest data from HDFS and store it locally for model training."""
     logger.info("Fetching data from HDFS using HDFS CLI...")
@@ -71,6 +70,7 @@ def fetch_data_from_hdfs():
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to fetch data from HDFS using CLI: {str(e)}")
         return None
+'''
 
 def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
     """Process data in batches using stratified sampling and evaluate metrics."""
