@@ -117,19 +117,20 @@ def batch_process_data(model, X_raw, y, batch_size=BATCH_SIZE):
             logging.info(f"Memory usage after batch processing: {stat}")
     else:
         logging.warning("No valid batches were processed for metric calculation.")
+def incremental_training(model, dataset, chunk_size=10000):
+    """Train the model incrementally in chunks."""
+    num_rows = len(dataset)
+    num_chunks = num_rows // chunk_size + (1 if num_rows % chunk_size != 0 else 0)
 
-def incremental_training(model, dataset):
-    """Incrementally train the model using chunks of data from the dataset."""
-    logger.info(f"Starting incremental training with chunk size {CHUNK_SIZE}...")
+    for i in range(num_chunks):
+        start_idx = i * chunk_size
+        end_idx = min(start_idx + chunk_size, num_rows)
 
-    for chunk_start in range(0, len(dataset), CHUNK_SIZE):
-        chunk_end = min(chunk_start + CHUNK_SIZE, len(dataset))
-        data_chunk = dataset.iloc[chunk_start:chunk_end]
+        logger.info(f"Processing chunk {i + 1} with {end_idx - start_idx} rows.")
+        chunk = dataset.iloc[start_idx:end_idx]
+        X_chunk, y_chunk = chunk['url'].values, chunk['label'].values
 
-        X_chunk, y_chunk = data_chunk['url'].values, data_chunk['label'].values
-
-        logger.info(f"Processing chunk {chunk_start // CHUNK_SIZE + 1} with {len(data_chunk)} rows.")
-        batch_process_data(model, X_chunk, y_chunk)
+        model.fit_online(X_chunk, y_chunk, classifier_type='sgd')  # Use SGD classifier
 
 def main():
     logger.info("Starting BustedURL system...")
