@@ -9,6 +9,8 @@ import logging
 import subprocess
 import os
 import random
+import zipfile
+import io
 
 # Configure logging to write to a file
 logging.basicConfig(
@@ -102,20 +104,28 @@ class RealTimeDataIngestion:
             self.logger.error(f"Error fetching benign URLs from Majestic Million: {str(e)}")
 
     def fetch_benign_urls_from_umbrella(self):
-        """Fetch benign URLs from Umbrella and process new ones."""
+        """Fetch benign URLs from Umbrella, extract CSV from ZIP, and process new ones."""
         api_url = "http://s3-us-west-1.amazonaws.com/umbrella-static/top-1m.csv.zip"
         try:
             self.logger.info("Fetching benign URLs from Umbrella...")
             response = requests.get(api_url, timeout=10)
             response.raise_for_status()
-            urls = response.text.splitlines()[1:101]  # Skip header, fetch 100 benign URLs
-
-            for line in urls:
-                url = line.split(',')[1]  # Extract URL from second column
-                if self.is_new_url(url):
-                    self.logger.debug(f"Collected new benign URL from Umbrella: {url}")
-                    self.urls_to_store.append({'url': url, 'status': 0})  # Mark as benign (0)
-                    self.mark_url_processed(url)
+    
+            # Open the ZIP file and extract the CSV
+            with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+                # Assuming there's only one CSV file inside
+                with z.open(z.namelist()[0]) as csvfile:
+                    urls = csvfile.read().decode('utf-8').splitlines()[1:101]  # Skip header, fetch 100 benign URLs
+    
+                    for line in urls:
+                        url = line.split(',')[0]  # Since there's only one column
+                        if self.is_new_url(url):
+                            self.logger.debug(f"Collected new benign URL from Umbrella: {url}")
+                            self.urls_to_store.append({'url': url, 'status': 0})  # Mark as benign (0)
+                            self.mark_url_processed(url)
+    
+        except zipfile.BadZipFile as e:
+            self.logger.error(f"Failed to unzip Umbrella dataset: {str(e)}")
         except requests.RequestException as e:
             self.logger.error(f"Error fetching benign URLs from Umbrella: {str(e)}")
 
