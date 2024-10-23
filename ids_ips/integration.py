@@ -3,6 +3,7 @@ import logging
 from kafka_broker import send_message
 from src.ensemble_model import EnsembleModel
 from src.utils.logger import get_logger
+import tracemalloc  # For memory profiling
 
 logger = get_logger("IDS_IPS")
 
@@ -39,14 +40,24 @@ class IDS_IPS_Integration:
         return False
 
     def analyze_url(self, url):
-        """Analyze the URL using the Ensemble model."""
+        """Analyze the URL using the Ensemble model and track memory usage."""
         if self.ensemble_model is None:
             logger.error("Ensemble model is not available for URL analysis.")
             return None
-        
+
+        # Memory profiling before analysis
+        tracemalloc.start()
+        start_snapshot = tracemalloc.take_snapshot()
+
         # Extract features using the ensemble model and classify the URL
         features = self.ensemble_model.extract_features([url])
         prediction = self.ensemble_model.classify(features)
+
+        # Memory profiling after analysis
+        end_snapshot = tracemalloc.take_snapshot()
+        memory_diff = end_snapshot.compare_to(start_snapshot, 'lineno')
+        for stat in memory_diff[:10]:
+            logger.info(f"Memory usage during URL analysis: {stat}")
 
         return prediction
 
