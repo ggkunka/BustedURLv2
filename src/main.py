@@ -179,10 +179,63 @@ def main():
     logger.info("System is now running in real-time mode.")
     run_real_time_mode()
 
-def process_url(url, ids_ips):
-    """Process URL using IDS/IPS and Ensemble Model."""
+def process_url(url, ids_ips, summary):
+    """Process URL using IDS/IPS and Ensemble Model, update summary."""
     result = ids_ips.process_incoming_url(url)
+    
+    if result == "blocked":
+        summary['blocked'] += 1
+    else:
+        summary['allowed'] += 1
+    
+    # Just logging the summary for each URL processed
     logger.info(f"URL {url} processed with result: {result}")
+
+def real_time_test(model, ids_ips, dataset, num_urls=500):
+    """Run a real-time test with a specified number of URLs."""
+    logger.info(f"Running real-time test with {num_urls} URLs.")
+    
+    # Randomly sample 500 URLs from the dataset
+    sampled_data = dataset.sample(n=num_urls, random_state=42)
+    
+    # Initialize summary counters
+    summary = {'blocked': 0, 'allowed': 0}
+
+    # Process URLs
+    for _, row in sampled_data.iterrows():
+        process_url(row['url'], ids_ips, summary)
+
+    # Print summary after processing
+    logger.info(f"Real-Time Test Summary: {summary['blocked']} URLs blocked, {summary['allowed']} URLs allowed.")
+
+    # Also print to the console
+    print(f"Real-Time Test Summary: {summary['blocked']} URLs blocked, {summary['allowed']} URLs allowed.")
+
+def run_real_time_mode():
+    """Keep system running in real-time mode for manual test invocation."""
+    logger.info("System is running in real-time mode.")
+    ids_ips = IDS_IPS_Integration()  # Initialize IDS/IPS system
+
+    # Infinite loop simulating the system running indefinitely
+    while True:
+        # Wait for manual real-time tests
+        print("\nReal-Time Testing Menu")
+        print("1. Run Basic Real-Time Test")
+        print("2. Run Load Test")
+        print("3. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            dataset = fetch_data_from_hdfs()
+            if dataset is not None:
+                real_time_test(None, ids_ips, dataset, num_urls=500)
+        elif choice == '2':
+            print("Load Test feature not implemented yet.")
+        elif choice == '3':
+            print("Exiting real-time mode.")
+            break
+        else:
+            print("Invalid choice. Please select again.")
 
 if __name__ == "__main__":
     main()
