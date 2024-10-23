@@ -138,6 +138,15 @@ def incremental_training(model, dataset, chunk_size=CHUNK_SIZE):
         # Explicit memory cleanup after each chunk
         gc.collect()
 
+def run_real_time_mode():
+    """Keep system running in real-time mode for manual test invocation."""
+    logger.info("System is running in real-time mode.")
+    ids_ips = IDS_IPS_Integration()  # Initialize IDS/IPS system
+
+    # Infinite loop simulating the system running indefinitely
+    while True:
+        time.sleep(10)  # Adjust this delay if needed
+
 def main():
     logger.info("Starting BustedURL system...")
 
@@ -161,19 +170,13 @@ def main():
         metrics = model.calculate_metrics(dataset['label'].values, y_pred, model.classify_proba(features))
         
         logger.info(f"Final Training Metrics: {metrics}")
-    
-    # Initialize IDS/IPS system
-    ids_ips = IDS_IPS_Integration()
       
     # Start Kafka Producer (replace KafkaBroker with KafkaProducer)
     kafka_producer = KafkaProducer()
 
-    # Example: Simulate URL processing
-    test_urls = ["http://malicious-example.com", "http://benign-example.com"]
-    for url in test_urls:
-        process_url(url, ids_ips)
-
+    # Start real-time mode
     logger.info("System is now running in real-time mode.")
+    run_real_time_mode()
 
 def process_url(url, ids_ips):
     """Process URL using IDS/IPS and Ensemble Model."""
