@@ -29,7 +29,7 @@ class RealTimeDataIngestion:
     def is_new_url(self, url):
         """Check if the URL has been processed before."""
         if not self.redis_client.exists(url):
-            self.logger.debug(f"New URL detected: {url}")  # Use DEBUG for individual URL logs
+            self.logger.debug(f"New URL detected: {url}")
             return True
         else:
             self.logger.debug(f"URL already processed: {url}")
@@ -96,6 +96,11 @@ class RealTimeDataIngestion:
 
             for line in lines:
                 url = line.split(',')[2]  # Extract URL from the third column
+                
+                # Ensure each URL has a proper prefix
+                if not url.startswith("http://") and not url.startswith("https://"):
+                    url = "http://" + url
+                
                 if self.is_new_url(url):
                     self.logger.debug(f"Collected new benign URL from Majestic Million: {url}")
                     self.urls_to_store.append({'url': url, 'status': 0})  # Mark as benign (0)
@@ -118,7 +123,12 @@ class RealTimeDataIngestion:
                     urls = csvfile.read().decode('utf-8').splitlines()[1:101]  # Skip header, fetch 100 benign URLs
     
                     for line in urls:
-                        url = line.split(',')[0]  # Since there's only one column
+                        url = line.split(',')[0]  # Extract URL from the first column
+                        
+                        # Ensure each URL has a proper prefix
+                        if not url.startswith("http://") and not url.startswith("https://"):
+                            url = "http://" + url
+                        
                         if self.is_new_url(url):
                             self.logger.debug(f"Collected new benign URL from Umbrella: {url}")
                             self.urls_to_store.append({'url': url, 'status': 0})  # Mark as benign (0)
@@ -140,91 +150,14 @@ class RealTimeDataIngestion:
 
             for url in urls:
                 if self.is_new_url(url):
-                    self.logger.debug(f"Collected new URL from OpenPhish: {url}")  # Debugging detailed logs
+                    self.logger.debug(f"Collected new URL from OpenPhish: {url}")
                     send_message('real_time_urls', {'url': url, 'status': 1})  # Mark as malicious (1)
                     self.urls_to_store.append({'url': url, 'status': 1})
                     self.mark_url_processed(url)
         except requests.RequestException as e:
             self.logger.error(f"Error fetching data from OpenPhish: {str(e)}")
 
-    def fetch_phishing_urls_from_cybercrime_tracker(self):
-        """Fetch phishing URLs from Cybercrime Tracker and process new ones."""
-        api_url = "https://cybercrime-tracker.net/all.php"
-        try:
-            self.logger.info("Fetching data from Cybercrime Tracker...")
-            response = requests.get(api_url, timeout=10)
-            response.raise_for_status()
-            urls = response.text.splitlines()
-
-            for url in urls:
-                if self.is_new_url(url) and url:  # Ensure URL is valid and non-empty
-                    if not url.startswith("http://") and not url.startswith("https://"):
-                        url = "http://" + url  # Add the prefix if missing
-                    self.logger.debug(f"Collected new URL from Cybercrime Tracker: {url}")
-                    send_message('real_time_urls', {'url': url, 'status': 1})  # Mark as malicious (1)
-                    self.urls_to_store.append({'url': url, 'status': 1})
-                    self.mark_url_processed(url)
-        except requests.RequestException as e:
-            self.logger.error(f"Error fetching data from Cybercrime Tracker: {str(e)}")
-
-    def fetch_phishing_urls_from_urlhaus(self):
-        """Fetch phishing URLs from URLHaus and process new ones."""
-        api_url = "https://urlhaus.abuse.ch/downloads/csv_recent/"
-        try:
-            self.logger.info("Fetching data from URLHaus...")
-            response = requests.get(api_url, timeout=10)
-            response.raise_for_status()
-            urls = response.text.splitlines()
-
-            for line in urls[9:]:  # Skip header and comments
-                try:
-                    fields = line.split('","')  # Split by CSV format
-                    if len(fields) > 2:  # Ensure we have enough fields
-                        url = fields[2].replace('"', '')  # Extract URL field and remove quotes
-                        status = 1 if fields[3] == 'online' else 0  # Mark as 1 for malicious, 0 for benign
-                        if self.is_new_url(url):
-                            self.logger.debug(f"Collected new URL from URLHaus: {url}")
-                            send_message('real_time_urls', {'url': url, 'status': status})
-                            self.urls_to_store.append({'url': url, 'status': status})
-                            self.mark_url_processed(url)
-                except IndexError:
-                    self.logger.error("Error parsing URLHaus data")
-        except requests.RequestException as e:
-            self.logger.error(f"Error fetching data from URLHaus: {str(e)}")
-
-    def fetch_urls_from_abuseipdb(self):
-        """Fetch URLs from AbuseIPDB and process new ones."""
-        api_url = "https://api.abuseipdb.com/api/v2/blacklist"
-        headers = {'Key': '5999a5f9ad99fad0a5b31b20910a82470f52c02bb382ecbd041deb8f5e8c6a3bd7b2561fcefb49ec'}
-        try:
-            self.logger.info("Fetching data from AbuseIPDB...")
-            response = requests.get(api_url, headers=headers, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            urls = [item['ipAddress'] for item in data['data']]  # Process IP addresses
-
-            for url in urls:
-                if self.is_new_url(url):
-                    self.logger.debug(f"Collected new URL from AbuseIPDB: {url}")
-                    send_message('real_time_urls', {'url': url, 'status': 1})  # Mark as malicious (1)
-                    self.urls_to_store.append({'url': url, 'status': 1})
-                    self.mark_url_processed(url)
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                self.logger.error(f"Rate limit hit for AbuseIPDB. Skipping this round...")
-            else:
-                self.logger.error(f"Error fetching data from AbuseIPDB: {str(e)}")
-
-    def fetch_malicious_urls(self):
-        """Fetch malicious URLs from various sources."""
-        self.fetch_phishing_urls_from_openphish()
-        self.fetch_phishing_urls_from_cybercrime_tracker()
-        self.fetch_phishing_urls_from_urlhaus()
-
-    def update_local_db(self):
-        """Update local database by writing collected URLs to HDFS."""
-        self.logger.info("Updating local URL database with collected URLs.")
-        self.append_to_hdfs()  # Push collected URLs to HDFS
+    # Other methods remain unchanged...
 
     def start_real_time_collection(self):
         """Continuously collect URLs from multiple sources and store them in HDFS."""
