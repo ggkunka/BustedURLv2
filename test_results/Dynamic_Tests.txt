@@ -1,0 +1,48 @@
+[yzhang10@ada BustedURLv2]$ python3.12 -m src.main
+2024-10-23 17:13:29.764 | INFO     | __main__:main:142 - Starting BustedURL system...
+Some weights of RobertaModel were not initialized from the model checkpoint at roberta-base and are newly initialized: ['roberta.pooler.dense.bias', 'roberta.pooler.dense.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+2024-10-23 17:13:34.873 | INFO     | __main__:fetch_data_from_hdfs:33 - Fetching data from HDFS using HDFS CLI...
+2024-10-23 17:13:34.873 | INFO     | __main__:fetch_data_from_hdfs:37 - Removing existing local file: /tmp/collected_urls.txt
+2024-10-23 17:13:36.384 | INFO     | __main__:fetch_data_from_hdfs:43 - Data successfully fetched from HDFS and saved to /tmp/collected_urls.txt
+2024-10-23 17:13:36.420 | INFO     | __main__:fetch_data_from_hdfs:46 - Data loaded successfully with 57806 rows.
+2024-10-23 17:13:36.421 | INFO     | __main__:incremental_training:131 - Processing chunk 1 with 10000 rows.
+2024-10-23 17:13:37.938 | INFO     | __main__:incremental_training:131 - Processing chunk 2 with 10000 rows.
+2024-10-23 17:13:40.674 | INFO     | __main__:incremental_training:131 - Processing chunk 3 with 10000 rows.
+2024-10-23 17:13:43.354 | INFO     | __main__:incremental_training:131 - Processing chunk 4 with 10000 rows.
+2024-10-23 17:13:46.086 | INFO     | __main__:incremental_training:131 - Processing chunk 5 with 10000 rows.
+2024-10-23 17:13:48.772 | INFO     | __main__:incremental_training:131 - Processing chunk 6 with 7806 rows.
+2024-10-23 17:13:50.917 | INFO     | __main__:main:156 - Model training completed and saved.
+2024-10-23 17:14:04.592 | INFO     | __main__:main:163 - Final Training Metrics: {'accuracy': 0.9005812545410511, 'precision': 0.9424826110219369, 'recall': 0.8532332283845968, 'f1_score': 0.8956400152535909, 'roc_auc': 0.9631320215745391, 'confusion_matrix': array([[27398,  1505],
+       [ 4242, 24661]]), 'tp': 24661, 'tn': 27398, 'fp': 1505, 'fn': 4242, 'tpr': 0.8532332283845968, 'fpr': 0.05207071930249455}
+2024-10-23 17:14:04.594 | ERROR    | ids_ips.integration:load_signature_db:32 - Signature database not found.
+Some weights of RobertaModel were not initialized from the model checkpoint at roberta-base and are newly initialized: ['roberta.pooler.dense.bias', 'roberta.pooler.dense.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+2024-10-23 17:14:08.124 | INFO     | ids_ips.integration:__init__:19 - Successfully loaded the ensemble model for IDS/IPS integration.
+2024-10-23 17:14:08.368 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/tracemalloc.py:558: size=52.1 KiB (+52.1 KiB), count=970 (+969), average=55 B
+2024-10-23 17:14:08.370 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/pickle.py:1486: size=56 B (-22.8 KiB), count=1 (-417), average=56 B
+2024-10-23 17:14:08.373 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/pickle.py:508: size=25.3 KiB (-18.3 KiB), count=462 (-334), average=56 B
+2024-10-23 17:14:08.375 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/torch/_weights_only_unpickler.py:287: size=0 B (-5472 B), count=0 (-114)
+2024-10-23 17:14:08.377 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/pickle.py:575: size=7714 B (-4648 B), count=150 (-83), average=51 B
+2024-10-23 17:14:08.379 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/sklearn/preprocessing/_data.py:1954: size=901 B (+480 B), count=18 (+9), average=50 B
+2024-10-23 17:14:08.381 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/numpy/core/_ufunc_config.py:436: size=552 B (+432 B), count=5 (+4), average=110 B
+2024-10-23 17:14:08.383 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/scipy/sparse/_compressed.py:76: size=21.1 MiB (+360 B), count=5 (+3), average=4321 KiB
+2024-10-23 17:14:08.385 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/numpy/core/fromnumeric.py:59: size=452 KiB (+352 B), count=9 (+5), average=50.2 KiB
+2024-10-23 17:14:08.387 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/sklearn/feature_extraction/text.py:1295: size=10.5 MiB (+220 B), count=4 (+2), average=2700 KiB
+2024-10-23 17:14:08.392 | INFO     | ids_ips.integration:process_incoming_url:82 - URL http://malicious-example.com classified as benign by the model. Allowing...
+2024-10-23 17:14:08.394 | INFO     | __main__:process_url:181 - URL http://malicious-example.com processed with result: allowed
+2024-10-23 17:14:08.532 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/sklearn/preprocessing/_data.py:1954: size=957 B (+480 B), count=19 (+9), average=50 B
+2024-10-23 17:14:08.534 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/numpy/core/fromnumeric.py:59: size=452 KiB (+352 B), count=10 (+5), average=45.2 KiB
+2024-10-23 17:14:08.536 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/scipy/sparse/_compressed.py:76: size=21.1 MiB (+296 B), count=5 (+2), average=4321 KiB
+2024-10-23 17:14:08.538 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/loguru/_file_sink.py:203: size=464 B (-240 B), count=5 (-3), average=93 B
+2024-10-23 17:14:08.540 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/kafka/protocol/types.py:163: size=4208 B (-216 B), count=66 (-3), average=64 B
+2024-10-23 17:14:08.542 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/loguru/_datetime.py:35: size=5124 B (-200 B), count=103 (-4), average=50 B
+2024-10-23 17:14:08.544 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/calendar.py:126: size=5596 B (-199 B), count=110 (-4), average=51 B
+2024-10-23 17:14:08.546 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/site-packages/sklearn/feature_extraction/text.py:1295: size=10.5 MiB (+196 B), count=4 (+2), average=2700 KiB
+2024-10-23 17:14:08.548 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/tracemalloc.py:560: size=192 B (+192 B), count=2 (+2), average=96 B
+2024-10-23 17:14:08.550 | INFO     | ids_ips.integration:analyze_url:60 - Memory usage during URL analysis: /home/yzhang10/python3.12/lib/python3.12/tracemalloc.py:423: size=192 B (+192 B), count=2 (+2), average=96 B
+2024-10-23 17:14:08.556 | INFO     | kafka_broker:send_message:22 - Sending message to topic alerts: {'url': 'http://benign-example.com', 'action': 'block'}
+2024-10-23 17:14:08.562 | INFO     | ids_ips.integration:process_incoming_url:79 - URL http://benign-example.com classified as malicious by the model. Blocking...
+2024-10-23 17:14:08.564 | INFO     | __main__:process_url:181 - URL http://benign-example.com processed with result: blocked
+2024-10-23 17:14:08.565 | INFO     | __main__:main:176 - System is now running in real-time mode.
+[yzhang10@ada BustedURLv2]$
