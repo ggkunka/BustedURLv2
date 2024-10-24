@@ -1,0 +1,17 @@
+2024-10-23 18:27:21.038 | INFO     | __main__:real_time_test:209 - Real-Time Test Summary: 235 URLs blocked, 265 URLs allowed.
+Real-Time Test Summary: 235 URLs blocked, 265 URLs allowed.
+
+Real-Time Testing Menu
+1. Run Basic Real-Time Test
+2. Run Load Test
+3. Exit
+Enter your choice: 2
+Load Test feature not implemented yet.
+
+Real-Time Testing Menu
+1. Run Basic Real-Time Test
+2. Run Load Test
+3. Exit
+Enter your choice: 3
+Exiting real-time mode.
+[yzhang10@ada BustedURLv2]$
