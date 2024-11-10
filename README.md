@@ -2,6 +2,9 @@
 
 **BustedURL** is an open-source **Collaborative Multi-Agent System (CMAS)** designed for real-time detection of malicious URLs. The system leverages advanced deep learning models, including BERT, RoBERTa, DistilBERT, and optional XLNet, to accurately classify URLs as malicious or benign.
 
+Paper accepted at ADC-2024. 
+https://adc-conference.github.io/2024/program/accepted-papers
+
 ## Features:
 - **Ensemble Learning**: Combines multiple transformer models for enhanced URL feature extraction.
 - **Scalability**: Utilizes **Kafka** and **Celery** for distributed processing, making the system capable of handling millions of URLs efficiently.
